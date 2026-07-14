@@ -8,6 +8,7 @@ QuoteOps is the separate OpenAI Build Week repository for Ralphi IA.
 - FastAPI skeleton in place
 - Reuse map created from the existing Ralphi IA stack
 - H2 structured intake analysis endpoint added
+- Frontend cockpit added for intake, reuse, and traceability
 
 ## Setup
 
@@ -30,8 +31,11 @@ python3 -m venv .venv
 
 ## Endpoints
 
+- `GET /`
+- `GET /cockpit`
 - `GET /health`
 - `GET /api/meta`
+- `GET /api/ui/bootstrap`
 - `GET /api/reuse`
 - `GET /api/reuse/verify`
 - `POST /api/intake/preview`
