@@ -9,6 +9,7 @@ QuoteOps is the separate OpenAI Build Week repository for Ralphi IA.
 - Reuse map created from the existing Ralphi IA stack
 - H2 structured intake analysis endpoint added
 - Frontend cockpit added for intake, reuse, and traceability
+- H3 tool planning endpoint added for approval and delivery routing
 
 ## Setup
 
@@ -40,10 +41,10 @@ python3 -m venv .venv
 - `GET /api/reuse/verify`
 - `POST /api/intake/preview`
 - `POST /api/intake/analyze`
+- `POST /api/plan`
 
 ## Next milestones
 
-- H3: tool adapters
 - H4: approval and PDF
 - H5: delivery and timeline
 - H6: sandbox and tests

@@ -10,12 +10,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_analysis
 from quoteops.adapters.ralfia_bridge import verify_stack
-from quoteops.contracts import QuoteIntake, QuoteIntakeAnalysis
+from quoteops.adapters.tool_planner import build_tool_plan
+from quoteops.contracts import QuoteIntake, QuoteIntakeAnalysis, QuoteToolPlan
 from quoteops.frontend import render_cockpit_page
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
-app = FastAPI(title="RalphiIA QuoteOps", version="0.3.0")
+app = FastAPI(title="RalphiIA QuoteOps", version="0.4.0")
 settings = get_settings()
 
 
@@ -82,6 +83,11 @@ async def intake_preview(intake: QuoteIntake) -> QuoteIntakeAnalysis:
 @app.post("/api/intake/analyze", response_model=QuoteIntakeAnalysis)
 async def intake_analyze(intake: QuoteIntake) -> QuoteIntakeAnalysis:
     return analyze_intake(intake, settings)
+
+
+@app.post("/api/plan", response_model=QuoteToolPlan)
+async def intake_plan(intake: QuoteIntake) -> QuoteToolPlan:
+    return build_tool_plan(intake)
 
 
 async def build_bootstrap() -> dict[str, object]:

@@ -61,3 +61,18 @@ class QuoteIntakeAnalysis(BaseModel):
     proposal_options: list[ProposalOption] = Field(default_factory=list)
     review: QuoteReview = Field(default_factory=QuoteReview)
     next_action: str = ""
+
+
+class ApprovalDraft(BaseModel):
+    status: Literal["blocked", "ready", "approved"] = "ready"
+    blockers: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class QuoteToolPlan(BaseModel):
+    ok: bool = True
+    mission: MissionState
+    intake: QuoteIntake
+    tool_decisions: list[ToolDecision] = Field(default_factory=list)
+    approval: ApprovalDraft = Field(default_factory=ApprovalDraft)
+    recommended_next_step: str = ""
