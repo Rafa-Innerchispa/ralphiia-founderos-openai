@@ -1,7 +1,8 @@
 from functools import lru_cache
-from pydantic import BaseModel
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -14,6 +15,8 @@ class Settings(BaseModel):
     ralfia_api_base: str = os.getenv("RALFIA_API_BASE", "http://127.0.0.1:8099")
     ralfia_mcp_url: str = os.getenv("RALFIA_MCP_URL", "http://127.0.0.1:8102/mcp")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.6")
+    enable_openai: bool = os.getenv("QUOTEOPS_ENABLE_OPENAI", "0").lower() in {"1", "true", "yes", "on"}
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
 
 @lru_cache(maxsize=1)

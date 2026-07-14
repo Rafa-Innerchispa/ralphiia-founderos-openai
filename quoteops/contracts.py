@@ -40,3 +40,24 @@ class MissionState(BaseModel):
     mission_id: str
     correlation_id: str
     status: Literal["intake", "analysis", "draft", "review", "delivery", "done"] = "intake"
+
+
+class QuoteAnalysisResult(BaseModel):
+    missing_information: MissingInformation = Field(default_factory=MissingInformation)
+    technical_risks: TechnicalRisk = Field(default_factory=TechnicalRisk)
+    proposal_options: list[ProposalOption] = Field(default_factory=list)
+    review: QuoteReview = Field(default_factory=QuoteReview)
+    next_action: str = ""
+
+
+class QuoteIntakeAnalysis(BaseModel):
+    ok: bool = True
+    analysis_source: Literal["openai", "fallback"] = "fallback"
+    model_used: str = "gpt-5.6"
+    mission: MissionState
+    intake: QuoteIntake
+    missing_information: MissingInformation = Field(default_factory=MissingInformation)
+    technical_risks: TechnicalRisk = Field(default_factory=TechnicalRisk)
+    proposal_options: list[ProposalOption] = Field(default_factory=list)
+    review: QuoteReview = Field(default_factory=QuoteReview)
+    next_action: str = ""
