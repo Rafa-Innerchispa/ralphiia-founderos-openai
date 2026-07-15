@@ -197,6 +197,25 @@ class RucConfirmRequest(BaseModel):
     ruc: str = Field(min_length=13, max_length=13)
     approved_by: str = Field(min_length=2, max_length=120)
     expected_verification_id: str = Field(min_length=5, max_length=80)
+    contact_email: str
+    billing_email: str
+    phone: str
+    address: str = Field(min_length=3, max_length=300)
+
+    @field_validator("contact_email")
+    @classmethod
+    def validate_contact_email(cls, value: str) -> str:
+        return validate_email_value(value, "contact_email")
+
+    @field_validator("billing_email")
+    @classmethod
+    def validate_billing_email(cls, value: str) -> str:
+        return validate_email_value(value, "billing_email")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        return validate_phone_value(value)
 
     @field_validator("ruc")
     @classmethod
