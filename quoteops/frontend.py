@@ -192,6 +192,23 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       </div>
     </section>
 
+
+    <section class="grid2" id="smartQuoterPanel">
+      <div class="panel">
+        <span class="eyebrow">Reuse bridge · Port 2026</span>
+        <h2 style="margin-top:16px;">Smart Quoter legacy engine</h2>
+        <p class="sub">Consulta el motor existente sin escribir clientes ni cotizaciones. El resultado vuelve al expediente QuoteOps para revisión.</p>
+        <div class="field"><label for="smartQuoterText">Solicitud o transcripción</label><textarea id="smartQuoterText">El cliente necesita modernizar su control de acceso y conservar parte del sistema existente.</textarea></div>
+        <div class="btn-row"><button class="secondary" id="smartQuoterDiagnoseBtn">Ejecutar diagnóstico heredado</button></div>
+        <div class="small" id="smartQuoterHint" style="margin-top:10px;">Fuente: Smart Quoter 2026 · modo no destructivo.</div>
+      </div>
+      <div class="panel">
+        <h2>Legacy analysis handoff</h2>
+        <p class="sub">Separa hechos del motor anterior y deja visible la procedencia para el juez y el operador.</p>
+        <div class="chips" id="smartQuoterChips"><span class="chip">waiting for diagnosis</span></div>
+        <div class="card jsonbox" style="margin-top:14px;"><pre id="smartQuoterJson">Esperando diagnóstico...</pre></div>
+      </div>
+    </section>
     <section class="grid2">
       <div class="panel">
         <h2>Reuse Map</h2>
@@ -431,6 +448,26 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       }
     }
 
+
+    async function runSmartQuoterDiagnosis() {
+      const text = document.getElementById('smartQuoterText').value.trim();
+      const hint = document.getElementById('smartQuoterHint');
+      const output = document.getElementById('smartQuoterJson');
+      if (!text) { hint.textContent = 'Escribe una solicitud antes de consultar.'; return; }
+      hint.textContent = 'Consultando Smart Quoter 2026...';
+      try {
+        const data = await fetchJson('/api/smart-quoter/diagnose', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transcription: text }),
+        });
+        output.textContent = JSON.stringify(data, null, 2);
+        document.getElementById('smartQuoterChips').innerHTML = '<span class="chip">source: Smart Quoter 2026</span><span class="chip">write: blocked</span><span class="chip">handoff: QuoteOps review</span>';
+        hint.textContent = 'Diagnóstico recibido; ninguna escritura fue ejecutada.';
+      } catch (error) {
+        output.textContent = JSON.stringify(error.payload || { error: error.message }, null, 2);
+        hint.textContent = 'Smart Quoter no disponible o devolvió un error.';
+      }
+    }
+
     async function refreshReuse() {
       const reuse = await fetchJson('/api/reuse');
       const verify = await fetchJson('/api/reuse/verify');
@@ -462,6 +499,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     document.getElementById('analyzeBtn').addEventListener('click', () => analyze('/api/intake/analyze'));
     document.getElementById('previewBtn').addEventListener('click', () => analyze('/api/intake/preview'));
     document.getElementById('verifyBtn').addEventListener('click', refreshReuse);
+    document.getElementById('smartQuoterDiagnoseBtn').addEventListener('click', runSmartQuoterDiagnosis);
     document.getElementById('rucLookupBtn').addEventListener('click', () => lookupRuc(false));
     document.getElementById('rucRefreshBtn').addEventListener('click', () => lookupRuc(true));
     document.getElementById('rucNewBtn').addEventListener('click', () => {

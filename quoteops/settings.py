@@ -13,6 +13,7 @@ class Settings(BaseModel):
     env: str = os.getenv("QUOTEOPS_ENV", "dev")
     mongo_uri: str = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/")
     ralfia_api_base: str = os.getenv("RALFIA_API_BASE", "http://127.0.0.1:8099")
+    smart_quoter_base_url: str = os.getenv("SMART_QUOTER_BASE_URL", "http://127.0.0.1:2026")
     ralfia_mcp_url: str = os.getenv("RALFIA_MCP_URL", "http://127.0.0.1:8102/mcp")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.6")
     enable_openai: bool = os.getenv("QUOTEOPS_ENABLE_OPENAI", "0").lower() in {"1", "true", "yes", "on"}

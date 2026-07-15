@@ -12,6 +12,7 @@ from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_ana
 from quoteops.adapters.quote_execution import QuoteExecutionService
 from quoteops.adapters.channel_intake import ChannelIntakeRouter
 from quoteops.adapters.ralfia_bridge import verify_stack
+from quoteops.adapters.smart_quoter import SmartQuoterAdapter
 from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError
 from quoteops.contracts import (
@@ -33,6 +34,7 @@ settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
 _channel_router = ChannelIntakeRouter(settings.quoteops_webhook_secret)
+_smart_quoter = SmartQuoterAdapter(settings.smart_quoter_base_url)
 
 
 @app.get("/")
@@ -154,6 +156,30 @@ async def ruc_confirm(request: RucConfirmRequest) -> RucConfirmationResult:
                 "message": "La verificación debe repetirse antes de confirmar.",
             },
         ) from exc
+
+
+@app.get("/api/smart-quoter/client/{client_id}")
+async def smart_quoter_client_lookup(client_id: str) -> JSONResponse:
+    """Read-only lookup through the existing Smart Quoter 2026 service."""
+    return JSONResponse(await _smart_quoter.client_lookup(client_id))
+
+
+@app.post("/api/smart-quoter/diagnose")
+async def smart_quoter_diagnose(request: dict) -> JSONResponse:
+    """Reuse Smart Quoter's local diagnostic engine without writing a quote."""
+    transcription = str(request.get("transcription") or "").strip()
+    if not transcription:
+        raise HTTPException(status_code=422, detail="transcription_required")
+    return JSONResponse(await _smart_quoter.diagnose(transcription))
+
+
+@app.post("/api/smart-quoter/refine")
+async def smart_quoter_refine(request: dict) -> JSONResponse:
+    analysis = request.get("current_analysis")
+    prompt = str(request.get("prompt") or "").strip()
+    if not isinstance(analysis, dict) or not prompt:
+        raise HTTPException(status_code=422, detail="analysis_and_prompt_required")
+    return JSONResponse(await _smart_quoter.refine(analysis, prompt))
 
 
 @app.post("/api/quote/approve")

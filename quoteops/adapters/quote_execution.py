@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
+from pymongo import MongoClient
+
 
 class QuoteExecutionService:
     """Staging-safe approval, PDF artifact and channel delivery router."""
@@ -13,6 +15,32 @@ class QuoteExecutionService:
         self.artifact_root = Path(settings.quoteops_artifact_root)
         self.artifact_root.mkdir(parents=True, exist_ok=True)
         self.approvals: dict[str, dict] = {}
+        self.db = None
+        self.mongo_client = None
+        try:
+            client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=1000)
+            client.admin.command("ping")
+            self.mongo_client = client
+            self.db = client[settings.quoteops_mongo_db]
+            self.db.quoteops_approvals.create_index("approval_id", unique=True)
+            self.db.quoteops_deliveries.create_index("delivery_id", unique=True)
+        except Exception:
+            try:
+                client.close()
+            except Exception:
+                pass
+            self.db = None
+
+    def close(self) -> None:
+        if self.mongo_client is not None:
+            self.mongo_client.close()
+            self.mongo_client = None
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def approve(self, request: dict) -> dict:
         intake = request.get("intake") or {}
@@ -24,18 +52,28 @@ class QuoteExecutionService:
         artifact_id = "artifact_" + uuid4().hex[:18]
         path = self.artifact_root / f"{artifact_id}.pdf"
         path.write_bytes(self._pdf(str(intake["customer_name"]), str(intake["original_text"])))
-        self.approvals[approval_id] = {"artifact_id": artifact_id, "path": str(path), "timeline": timeline + [self._event("approved", "Aprobacion humana registrada")]}
+        record = {"approval_id": approval_id, "artifact_id": artifact_id, "path": str(path), "timeline": timeline + [self._event("approved", "Aprobacion humana registrada")]}
+        self.approvals[approval_id] = record
+        if self.db is not None:
+            self.db.quoteops_approvals.replace_one({"approval_id": approval_id}, record, upsert=True)
         return {"ok": True, "approval_id": approval_id, "status": "approved", "mode": request.get("mode", "sandbox"), "artifact_id": artifact_id, "pdf_url": f"/api/quote/artifacts/{artifact_id}.pdf", "timeline": self.approvals[approval_id]["timeline"]}
 
     def deliver(self, request: dict) -> dict:
-        record = self.approvals.get(request.get("approval_id"))
+        approval_id = request.get("approval_id")
+        record = self.approvals.get(approval_id)
+        if record is None and self.db is not None and approval_id:
+            record = self.db.quoteops_approvals.find_one({"approval_id": approval_id}, {"_id": 0})
         mode = request.get("mode", "sandbox")
         channels = request.get("channels") or ["web"]
         if not record:
             return {"ok": True, "status": "blocked", "channels": channels, "mode": mode, "timeline": [self._event("delivery_blocked", "Aprobacion no encontrada")]}
         if mode == "owner" and not self.settings.allow_production_writes:
             return {"ok": True, "status": "blocked", "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event("delivery_blocked", "Produccion deshabilitada en staging")]}
-        return {"ok": True, "delivery_id": "delivery_" + uuid4().hex[:18], "status": "simulated" if mode == "sandbox" else "queued", "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event("delivery_simulated" if mode == "sandbox" else "delivery_queued", "Entrega registrada sin envio arbitrario")]}
+        delivery_id = "delivery_" + uuid4().hex[:18]
+        delivery = {"delivery_id": delivery_id, "approval_id": approval_id, "status": "simulated" if mode == "sandbox" else "queued", "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event("delivery_simulated" if mode == "sandbox" else "delivery_queued", "Entrega registrada sin envio arbitrario")]}
+        if self.db is not None:
+            self.db.quoteops_deliveries.insert_one(delivery)
+        return {"ok": True, **delivery}
 
     def artifact_path(self, artifact_id: str):
         path = self.artifact_root / f"{artifact_id}.pdf"
