@@ -6,9 +6,10 @@ from pathlib import Path
 from platform import node
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_analysis
+from quoteops.adapters.quote_execution import QuoteExecutionService
 from quoteops.adapters.ralfia_bridge import verify_stack
 from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError
@@ -29,6 +30,7 @@ from quoteops.settings import get_settings
 app = FastAPI(title="RalphiIA QuoteOps", version="0.4.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
+_execution_service = QuoteExecutionService(settings)
 
 
 @app.get("/")
@@ -150,6 +152,24 @@ async def ruc_confirm(request: RucConfirmRequest) -> RucConfirmationResult:
                 "message": "La verificación debe repetirse antes de confirmar.",
             },
         ) from exc
+
+
+@app.post("/api/quote/approve")
+async def quote_approve(request: dict) -> JSONResponse:
+    return JSONResponse(_execution_service.approve(request))
+
+
+@app.get("/api/quote/artifacts/{artifact_id}.pdf")
+async def quote_artifact(artifact_id: str) -> FileResponse:
+    path = _execution_service.artifact_path(artifact_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="artifact_not_found")
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.post("/api/quote/deliver")
+async def quote_deliver(request: dict) -> JSONResponse:
+    return JSONResponse(_execution_service.deliver(request))
 
 
 def _get_identity_service() -> CustomerIdentityService:

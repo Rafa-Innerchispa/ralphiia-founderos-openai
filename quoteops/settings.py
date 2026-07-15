@@ -34,6 +34,7 @@ class Settings(BaseModel):
         "on",
     }
     quoteops_mongo_db: str = os.getenv("QUOTEOPS_MONGO_DB", "ralphiia_quoteops_staging")
+    quoteops_artifact_root: str = os.getenv("QUOTEOPS_ARTIFACT_ROOT", "/tmp/ralphiia-quoteops-artifacts")
     ralfia_package_root: str = os.getenv(
         "RALFIA_PACKAGE_ROOT", "/home/rlopez/projects/raphiia-openai"
     )
