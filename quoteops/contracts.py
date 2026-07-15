@@ -235,3 +235,5 @@ class RucConfirmationResult(BaseModel):
     ruc: str
     persistence_target: str = "quoteops_staging"
     duplicate_count: int = 1
+    canonical_status: Literal["staging_only", "upserted", "blocked", "error"] = "staging_only"
+    canonical_client_id: str = ""

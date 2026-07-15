@@ -198,6 +198,27 @@ class QuoteOpsCustomerStore:
             {"$set": {"party_id": party_id, "client_id": client_id, "updated_at": now}, "$setOnInsert": {"created_at": now}},
             upsert=True,
         )
+        canonical_status = "staging_only"
+        canonical_client_id = ""
+        if self.settings.allow_production_writes:
+            try:
+                from raphiia_openai.operational.pcdoctor_store import upsert_client
+                canonical = upsert_client({
+                    "display_name": verification.get("legal_name") or "",
+                    "legal_name": verification.get("legal_name") or "",
+                    "trade_name": verification.get("commercial_name") or "",
+                    "tax_id": ruc,
+                    "phone": phone,
+                    "email": contact_email,
+                    "address": address,
+                    "status": "active",
+                    "source": "ralphiia_quoteops",
+                })
+                canonical_status = "upserted" if canonical.get("ok") else "error"
+                canonical_client_id = str(canonical.get("client_id") or (canonical.get("client") or {}).get("client_id") or "")
+            except Exception:
+                canonical_status = "error"
+
         self.audit.insert_one(
             {
                 "trace_id": trace_id,
