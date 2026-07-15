@@ -5,19 +5,30 @@ from getpass import getuser
 from pathlib import Path
 from platform import node
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_analysis
 from quoteops.adapters.ralfia_bridge import verify_stack
 from quoteops.adapters.tool_planner import build_tool_plan
-from quoteops.contracts import QuoteIntake, QuoteIntakeAnalysis, QuoteToolPlan
+from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError
+from quoteops.contracts import (
+    QuoteIntake,
+    QuoteIntakeAnalysis,
+    QuoteToolPlan,
+    RucConfirmationResult,
+    RucConfirmRequest,
+    RucLookupRequest,
+    RucLookupResult,
+)
+from quoteops.customer_identity import CustomerIdentityService
 from quoteops.frontend import render_cockpit_page
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
 app = FastAPI(title="RalphiIA QuoteOps", version="0.4.0")
 settings = get_settings()
+_identity_service: CustomerIdentityService | None = None
 
 
 @app.get("/")
@@ -88,6 +99,64 @@ async def intake_analyze(intake: QuoteIntake) -> QuoteIntakeAnalysis:
 @app.post("/api/plan", response_model=QuoteToolPlan)
 async def intake_plan(intake: QuoteIntake) -> QuoteToolPlan:
     return build_tool_plan(intake)
+
+
+@app.get("/api/ruc/status")
+async def ruc_status() -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": True,
+            "live_enabled": settings.ruc_api_live_enabled,
+            "credentials_configured": bool(
+                settings.ruc_api_username and settings.ruc_api_password
+            ),
+            "persistence_target": settings.quoteops_mongo_db,
+            "production_writes_enabled": settings.allow_production_writes,
+        }
+    )
+
+
+@app.post("/api/ruc/lookup", response_model=RucLookupResult)
+async def ruc_lookup(request: RucLookupRequest) -> RucLookupResult:
+    try:
+        return await _get_identity_service().lookup(request)
+    except TaxpayerRegistryError as exc:
+        trace_id = "trace_ruc_error"
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={
+                "code": exc.code,
+                "message": exc.public_message,
+                "retryable": exc.retryable,
+                "trace_id": trace_id,
+            },
+        ) from exc
+
+
+@app.post("/api/ruc/confirm", response_model=RucConfirmationResult)
+async def ruc_confirm(request: RucConfirmRequest) -> RucConfirmationResult:
+    try:
+        return await _get_identity_service().confirm(request)
+    except TaxpayerRegistryError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.public_message},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "verification_not_found_or_stale",
+                "message": "La verificación debe repetirse antes de confirmar.",
+            },
+        ) from exc
+
+
+def _get_identity_service() -> CustomerIdentityService:
+    global _identity_service
+    if _identity_service is None:
+        _identity_service = CustomerIdentityService(settings)
+    return _identity_service
 
 
 async def build_bootstrap() -> dict[str, object]:

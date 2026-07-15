@@ -21,7 +21,7 @@ def build_cockpit_bootstrap(payload: dict[str, Any]) -> dict[str, Any]:
 
 def render_cockpit_page(payload: dict[str, Any]) -> str:
     bootstrap = build_cockpit_bootstrap(payload)
-    bootstrap_json = html.escape(json.dumps(bootstrap, ensure_ascii=False))
+    bootstrap_json = json.dumps(bootstrap, ensure_ascii=False).replace("</", "<\\/")
     meta_json = html.escape(json.dumps(payload.get("meta", {}), ensure_ascii=False))
     template = """<!doctype html>
 <html lang="es">
@@ -93,8 +93,13 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     .foot { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
     .jsonbox { max-height: 280px; overflow: auto; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .ruc-grid { display: grid; grid-template-columns: .75fr 1.25fr; gap: 18px; margin-top: 18px; }
+    .signal { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 16px; background: rgba(3, 8, 16, .5); }
+    .signal strong { font-size: 15px; }
+    .signal span { color: var(--muted); font-size: 12px; }
+    .verified { color: var(--accent-2); }
     .accent-line { width: 66px; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); margin: 18px 0; }
-    @media (max-width: 1180px) { .hero, .grid, .grid2 { grid-template-columns: 1fr; } }
+    @media (max-width: 1180px) { .hero, .grid, .grid2, .ruc-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -159,6 +164,32 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       </div>
     </section>
 
+    <section class="ruc-grid">
+      <div class="panel">
+        <span class="eyebrow">Trust anchor · Owner mode</span>
+        <h2 style="margin-top:16px;">Verificar empresa por RUC</h2>
+        <p class="sub">Intuito confirma la identidad; RalphiIA y Contífico aportan contexto. Nada se modifica sin aprobación.</p>
+        <div class="field"><label for="rucInput">RUC ecuatoriano</label><input id="rucInput" value="0992364866001" inputmode="numeric" maxlength="13" /></div>
+        <div class="btn-row">
+          <button class="primary" id="rucLookupBtn">Consultar y comparar</button>
+          <button class="ghost" id="rucNewBtn">Probar RUC nuevo</button>
+          <button class="secondary" id="rucRefreshBtn">Refrescar fuente</button>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="field"><label for="approvedBy">Aprobado por</label><input id="approvedBy" value="Rafael" /></div>
+          <button class="secondary" id="rucConfirmBtn" disabled>Confirmar creación / actualización</button>
+          <div class="small" id="rucConfirmHint" style="margin-top:10px;">Primero consulta y revisa la evidencia.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Identity Reconciliation</h2>
+        <p class="sub">Datos oficiales, coincidencias internas, conflictos y borrador propuesto en una sola vista.</p>
+        <div class="chips" id="rucChips"><span class="chip">waiting for verification</span></div>
+        <div class="list" id="rucSignals" style="margin-top:14px;"></div>
+        <div class="card" style="margin-top:14px;"><pre id="rucJson">Introduce un RUC para iniciar.</pre></div>
+      </div>
+    </section>
+
     <section class="grid2">
       <div class="panel">
         <h2>Reuse Map</h2>
@@ -188,6 +219,12 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     const analysisChips = document.getElementById('analysisChips');
     const analysisHint = document.getElementById('analysisHint');
     const timeline = document.getElementById('timeline');
+    const rucJson = document.getElementById('rucJson');
+    const rucSignals = document.getElementById('rucSignals');
+    const rucChips = document.getElementById('rucChips');
+    const rucConfirmBtn = document.getElementById('rucConfirmBtn');
+    const rucConfirmHint = document.getElementById('rucConfirmHint');
+    let currentVerification = null;
 
     const phases = ['intake', 'analysis', 'draft', 'review', 'delivery', 'done'];
     const phaseLabels = { intake: 'Intake', analysis: 'Analysis', draft: 'Draft', review: 'Review', delivery: 'Delivery', done: 'Done' };
@@ -266,7 +303,93 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
 
     async function fetchJson(url, options) {
       const response = await fetch(url, options);
-      return await response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.detail?.message || 'Request failed');
+        error.payload = data;
+        throw error;
+      }
+      return data;
+    }
+
+    function renderRucResult(data) {
+      currentVerification = data.verification;
+      rucJson.textContent = JSON.stringify(data, null, 2);
+      rucConfirmBtn.disabled = false;
+      rucConfirmHint.textContent = `Acción propuesta: ${data.customer_draft.recommended_action}. Persistencia: ${data.persistence_target}.`;
+      rucChips.innerHTML = '';
+      [
+        `source: ${data.verification.source}`,
+        `status: ${data.verification.upstream_status}`,
+        `matches: ${data.comparison.matches.length}`,
+        `conflicts: ${data.comparison.conflicts.length}`,
+        `checksum: ${data.verification.checksum_valid ? 'valid' : 'provider-confirmed / local warning'}`,
+      ].forEach((label) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = label;
+        rucChips.appendChild(chip);
+      });
+      const verification = data.verification;
+      const firstSite = verification.establishments[0];
+      const signals = [
+        ['Verified legal name', verification.legal_name || 'Not returned'],
+        ['Commercial name', verification.commercial_name || 'Not returned'],
+        ['Economic activity', verification.activity || 'Not returned'],
+        ['Primary establishment', firstSite?.full_address || 'Not returned'],
+        ['RalphiIA / Contífico', data.comparison.matches.map((item) => item.source).join(', ') || 'No existing match'],
+        ['Human gate', 'Required before create or update'],
+      ];
+      rucSignals.innerHTML = '';
+      signals.forEach(([label, value], index) => {
+        const card = document.createElement('div');
+        card.className = 'signal';
+        const strong = document.createElement('strong');
+        strong.className = index === 0 ? 'verified' : '';
+        strong.textContent = value;
+        const span = document.createElement('span');
+        span.textContent = label;
+        card.append(strong, span);
+        rucSignals.appendChild(card);
+      });
+    }
+
+    async function lookupRuc(forceRefresh = false) {
+      rucConfirmBtn.disabled = true;
+      rucJson.textContent = 'Consultando Intuito y reconciliando fuentes...';
+      try {
+        const data = await fetchJson('/api/ruc/lookup', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ruc: document.getElementById('rucInput').value, force_refresh: forceRefresh, mode: 'owner' }),
+        });
+        renderRucResult(data);
+      } catch (error) {
+        currentVerification = null;
+        rucJson.textContent = JSON.stringify(error.payload || { error: error.message }, null, 2);
+        rucConfirmHint.textContent = 'Consulta bloqueada; revisa el error y el trace ID.';
+      }
+    }
+
+    async function confirmRuc() {
+      if (!currentVerification) return;
+      rucConfirmBtn.disabled = true;
+      try {
+        const result = await fetchJson('/api/ruc/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            ruc: currentVerification.ruc,
+            approved_by: document.getElementById('approvedBy').value,
+            expected_verification_id: currentVerification.verification_id,
+          }),
+        });
+        rucConfirmHint.textContent = `${result.action.toUpperCase()} · party ${result.party_id} · client ${result.client_id} · duplicates ${result.duplicate_count}`;
+        await lookupRuc(false);
+      } catch (error) {
+        rucConfirmHint.textContent = error.payload?.detail?.message || error.message;
+        rucConfirmBtn.disabled = false;
+      }
     }
 
     async function refreshReuse() {
@@ -298,6 +421,13 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     document.getElementById('analyzeBtn').addEventListener('click', () => analyze('/api/intake/analyze'));
     document.getElementById('previewBtn').addEventListener('click', () => analyze('/api/intake/preview'));
     document.getElementById('verifyBtn').addEventListener('click', refreshReuse);
+    document.getElementById('rucLookupBtn').addEventListener('click', () => lookupRuc(false));
+    document.getElementById('rucRefreshBtn').addEventListener('click', () => lookupRuc(true));
+    document.getElementById('rucNewBtn').addEventListener('click', () => {
+      document.getElementById('rucInput').value = '0993402875001';
+      lookupRuc(true);
+    });
+    rucConfirmBtn.addEventListener('click', confirmRuc);
 
     renderTimeline('analysis');
     refreshReuse();

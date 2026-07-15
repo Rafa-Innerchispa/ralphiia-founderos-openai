@@ -10,6 +10,7 @@ QuoteOps is the separate OpenAI Build Week repository for Ralphi IA.
 - H2 structured intake analysis endpoint added
 - Frontend cockpit added for intake, reuse, and traceability
 - H3 tool planning endpoint added for approval and delivery routing
+- P0 live RUC trust-anchor flow added with Intuito, RalphiIA/Contífico reconciliation, human approval, and staging idempotency
 
 ## Setup
 
@@ -42,6 +43,15 @@ python3 -m venv .venv
 - `POST /api/intake/preview`
 - `POST /api/intake/analyze`
 - `POST /api/plan`
+- `GET /api/ruc/status`
+- `POST /api/ruc/lookup`
+- `POST /api/ruc/confirm`
+
+## Live RUC trust anchor
+
+Owner mode can verify an Ecuadorian RUC against the configured provider, compare the result with the existing RalphiIA identity kernel and Contífico mirror, prefill a customer draft, expose conflicts, and wait for explicit confirmation. Confirmed records are stored in the isolated `ralphiia_quoteops_staging` database by default, with unique RUC indexes and a source identity map.
+
+Credentials are server-side only. Keep `RUC_API_USERNAME` and `RUC_API_PASSWORD` out of source, logs, screenshots, and public CI. Production writes remain disabled unless Rafael grants a separate explicit authorization.
 
 ## Next milestones
 

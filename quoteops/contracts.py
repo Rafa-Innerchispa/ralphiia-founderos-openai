@@ -76,3 +76,95 @@ class QuoteToolPlan(BaseModel):
     tool_decisions: list[ToolDecision] = Field(default_factory=list)
     approval: ApprovalDraft = Field(default_factory=ApprovalDraft)
     recommended_next_step: str = ""
+
+
+class RucLookupRequest(BaseModel):
+    ruc: str
+    force_refresh: bool = False
+    mode: Literal["owner", "sandbox"] = "owner"
+
+
+class TaxpayerEstablishment(BaseModel):
+    commercial_name: str = ""
+    number: str = ""
+    establishment_type: str = ""
+    full_address: str = ""
+
+
+class TaxpayerVerification(BaseModel):
+    verification_id: str
+    ruc: str
+    legal_name: str = ""
+    commercial_name: str = ""
+    activity: str = ""
+    legal_representative: str = ""
+    establishments: list[TaxpayerEstablishment] = Field(default_factory=list)
+    source: Literal["intuito_azure", "sandbox_fixture"] = "intuito_azure"
+    retrieved_at: str
+    upstream_status: str = "verified"
+    checksum_valid: bool = False
+    cache_status: Literal["live", "fresh_cache", "sandbox"] = "live"
+
+
+class IdentityMatch(BaseModel):
+    source: str
+    source_id: str = ""
+    party_id: str = ""
+    client_id: str = ""
+    legal_name: str = ""
+    commercial_name: str = ""
+    ruc: str = ""
+    address: str = ""
+    linked: bool = False
+
+
+class IdentityConflict(BaseModel):
+    field: str
+    source: str
+    official_value: str = ""
+    source_value: str = ""
+    severity: Literal["info", "warning", "critical"] = "warning"
+
+
+class CustomerComparison(BaseModel):
+    matches: list[IdentityMatch] = Field(default_factory=list)
+    conflicts: list[IdentityConflict] = Field(default_factory=list)
+    exact_ruc_match: bool = False
+    recommended_action: Literal["create", "update", "link_existing", "review"] = "create"
+
+
+class CustomerDraft(BaseModel):
+    ruc: str
+    legal_name: str
+    commercial_name: str = ""
+    activity: str = ""
+    address: str = ""
+    recommended_action: Literal["create", "update", "link_existing", "review"] = "create"
+
+
+class RucLookupResult(BaseModel):
+    ok: bool = True
+    trace_id: str
+    verification: TaxpayerVerification
+    comparison: CustomerComparison
+    customer_draft: CustomerDraft
+    approval_required: bool = True
+    persistence_target: str = "quoteops_staging"
+
+
+class RucConfirmRequest(BaseModel):
+    ruc: str
+    approved_by: str = Field(min_length=2, max_length=120)
+    expected_verification_id: str
+
+
+class RucConfirmationResult(BaseModel):
+    ok: bool = True
+    trace_id: str
+    created: bool
+    action: Literal["created", "updated", "linked"]
+    party_id: str
+    client_id: str
+    ruc: str
+    persistence_target: str = "quoteops_staging"
+    duplicate_count: int = 1
