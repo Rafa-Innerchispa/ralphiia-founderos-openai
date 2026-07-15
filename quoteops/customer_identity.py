@@ -50,6 +50,10 @@ class CustomerIdentityService:
             ruc,
             request.approved_by,
             _trace_id(ruc),
+            contact_email=request.contact_email,
+            billing_email=request.billing_email,
+            phone=request.phone,
+            address=request.address,
         )
 
 

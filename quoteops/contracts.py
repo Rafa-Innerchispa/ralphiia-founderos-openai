@@ -3,6 +3,20 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 
+def validate_email_value(value: str, field_name: str = "email") -> str:
+    value = str(value or "").strip()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+        raise ValueError(f"{field_name} debe tener un correo valido con dominio")
+    return value.lower()
+
+
+def validate_phone_value(value: str) -> str:
+    value = str(value or "").strip()
+    if not re.fullmatch(r"\+?[0-9][0-9 .()\-]{6,19}", value):
+        raise ValueError("phone debe contener un telefono valido")
+    return value
+
+
 class QuoteIntake(BaseModel):
     source_channel: Literal["whatsapp", "telegram", "chatgpt_mcp", "web", "sandbox"] = "sandbox"
     customer_name: str = Field(default="", max_length=200, description="Nombre del cliente o solicitante")
@@ -163,6 +177,9 @@ class CustomerDraft(BaseModel):
     commercial_name: str = ""
     activity: str = ""
     address: str = ""
+    phone: str = ""
+    contact_email: str = ""
+    billing_email: str = ""
     recommended_action: Literal["create", "update", "link_existing", "review"] = "create"
 
 

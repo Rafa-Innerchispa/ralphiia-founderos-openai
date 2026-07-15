@@ -176,7 +176,9 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
           <button class="secondary" id="rucRefreshBtn">Refrescar fuente</button>
         </div>
         <div class="card" style="margin-top:16px;">
-          <div class="field"><label for="approvedBy">Aprobado por</label><input id="approvedBy" value="Rafael" /></div>
+          <div class="field"><label for="approvedBy">Aprobado por</label><input id="approvedBy" value="Rafael" maxlength="120" required /></div>
+          <div class="row"><div class="field"><label for="clientPhone">Teléfono del cliente</label><input id="clientPhone" inputmode="tel" pattern="\+?[0-9][0-9 .()\-]{6,19}" placeholder="+593 99..." required /></div><div class="field"><label for="clientAddress">Dirección</label><input id="clientAddress" maxlength="300" required /></div></div>
+          <div class="row"><div class="field"><label for="contactEmail">Correo de contacto</label><input id="contactEmail" type="email" autocomplete="email" placeholder="cliente@dominio.com" required /></div><div class="field"><label for="billingEmail">Correo de facturación electrónica</label><input id="billingEmail" type="email" autocomplete="billing email" placeholder="facturacion@dominio.com" required /></div></div>
           <button class="secondary" id="rucConfirmBtn" disabled>Confirmar creación / actualización</button>
           <div class="small" id="rucConfirmHint" style="margin-top:10px;">Primero consulta y revisa la evidencia.</div>
         </div>
@@ -398,8 +400,14 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       }
     }
 
+    function validateCustomerFields() {
+      const ids = ['approvedBy', 'clientPhone', 'clientAddress', 'contactEmail', 'billingEmail'];
+      for (const id of ids) { const field = document.getElementById(id); if (!field.checkValidity()) { field.reportValidity(); return false; } }
+      return true;
+    }
+
     async function confirmRuc() {
-      if (!currentVerification) return;
+      if (!currentVerification || !validateCustomerFields()) return;
       rucConfirmBtn.disabled = true;
       try {
         const result = await fetchJson('/api/ruc/confirm', {
@@ -409,6 +417,10 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
             ruc: currentVerification.ruc,
             approved_by: document.getElementById('approvedBy').value,
             expected_verification_id: currentVerification.verification_id,
+            contact_email: document.getElementById('contactEmail').value,
+            billing_email: document.getElementById('billingEmail').value,
+            phone: document.getElementById('clientPhone').value,
+            address: document.getElementById('clientAddress').value,
           }),
         });
         rucConfirmHint.textContent = `${result.action.toUpperCase()} · party ${result.party_id} · client ${result.client_id} · duplicates ${result.duplicate_count}`;

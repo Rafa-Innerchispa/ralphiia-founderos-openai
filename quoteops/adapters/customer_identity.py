@@ -132,6 +132,11 @@ class QuoteOpsCustomerStore:
         ruc: str,
         approved_by: str,
         trace_id: str,
+        *,
+        contact_email: str,
+        billing_email: str,
+        phone: str,
+        address: str,
     ) -> RucConfirmationResult:
         return await asyncio.to_thread(
             self._confirm_sync, verification_id, ruc, approved_by, trace_id
@@ -143,6 +148,11 @@ class QuoteOpsCustomerStore:
         ruc: str,
         approved_by: str,
         trace_id: str,
+        *,
+        contact_email: str,
+        billing_email: str,
+        phone: str,
+        address: str,
     ) -> RucConfirmationResult:
         verification = self.verifications.find_one(
             {"verification_id": verification_id, "ruc": ruc}
@@ -157,7 +167,8 @@ class QuoteOpsCustomerStore:
         client_id = str((existing_client or {}).get("client_id") or f"qclient_{digest}")
         now = datetime.now(timezone.utc).isoformat()
         establishments = verification.get("establishments") or []
-        address = str(establishments[0].get("full_address") or "") if establishments else ""
+        provider_address = str(establishments[0].get("full_address") or "") if establishments else ""
+        address = address.strip() or provider_address
         shared = {
             "legal_name": verification.get("legal_name") or "",
             "trade_name": verification.get("commercial_name") or "",
@@ -166,6 +177,9 @@ class QuoteOpsCustomerStore:
             "verification_id": verification_id,
             "verified_at": verification.get("retrieved_at"),
             "approved_by": approved_by,
+            "contact_email": contact_email,
+            "billing_email": billing_email,
+            "phone": phone,
             "updated_at": now,
         }
         self.parties.update_one(
@@ -175,7 +189,7 @@ class QuoteOpsCustomerStore:
         )
         self.clients.update_one(
             {"tax_id": ruc},
-            {"$set": {**shared, "client_id": client_id, "party_id": party_id, "address": address, "status": "active"}, "$setOnInsert": {"created_at": now}},
+            {"$set": {**shared, "client_id": client_id, "party_id": party_id, "address": address, "phone": phone, "contact_email": contact_email, "billing_email": billing_email, "status": "active"}, "$setOnInsert": {"created_at": now}},
             upsert=True,
         )
         self.identity_map.update_one(
