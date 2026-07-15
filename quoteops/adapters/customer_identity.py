@@ -139,7 +139,8 @@ class QuoteOpsCustomerStore:
         address: str,
     ) -> RucConfirmationResult:
         return await asyncio.to_thread(
-            self._confirm_sync, verification_id, ruc, approved_by, trace_id
+            self._confirm_sync, verification_id, ruc, approved_by, trace_id,
+            contact_email=contact_email, billing_email=billing_email, phone=phone, address=address,
         )
 
     def _confirm_sync(
