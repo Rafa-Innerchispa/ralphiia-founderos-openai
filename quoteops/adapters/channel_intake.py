@@ -14,7 +14,7 @@ class ChannelIntakeRouter:
         self.seen: dict[str, dict] = {}
 
     def ingest(self, channel: str, payload: dict[str, Any], signature: str = "") -> dict[str, Any]:
-        if channel in {"whatsapp", "telegram"} and self.secret and not self._valid_signature(payload, signature):
+        if channel in {"whatsapp", "telegram", "chatgpt_mcp"} and self.secret and not self._valid_signature(payload, signature):
             return {"ok": False, "status": "rejected", "reason": "invalid_signature"}
         event_id = str(payload.get("event_id") or payload.get("update_id") or payload.get("message_id") or self._digest(payload))
         if event_id in self.seen:
