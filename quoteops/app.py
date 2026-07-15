@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_analysis
 from quoteops.adapters.quote_execution import QuoteExecutionService
+from quoteops.adapters.channel_intake import ChannelIntakeRouter
 from quoteops.adapters.ralfia_bridge import verify_stack
 from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError
@@ -31,6 +32,7 @@ app = FastAPI(title="RalphiIA QuoteOps", version="0.4.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
+_channel_router = ChannelIntakeRouter()
 
 
 @app.get("/")
@@ -170,6 +172,23 @@ async def quote_artifact(artifact_id: str) -> FileResponse:
 @app.post("/api/quote/deliver")
 async def quote_deliver(request: dict) -> JSONResponse:
     return JSONResponse(_execution_service.deliver(request))
+
+
+@app.post("/api/intake/channel")
+async def channel_intake(request: dict) -> JSONResponse:
+    channel = str(request.get("channel") or "web")
+    payload = request.get("payload") or {}
+    return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
+
+
+@app.post("/api/webhooks/whatsapp")
+async def whatsapp_webhook(request: dict) -> JSONResponse:
+    return JSONResponse(_channel_router.ingest("whatsapp", request, str(request.get("signature") or "")))
+
+
+@app.post("/api/webhooks/telegram")
+async def telegram_webhook(request: dict) -> JSONResponse:
+    return JSONResponse(_channel_router.ingest("telegram", request, str(request.get("signature") or "")))
 
 
 def _get_identity_service() -> CustomerIdentityService:
