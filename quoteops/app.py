@@ -32,7 +32,7 @@ app = FastAPI(title="RalphiIA QuoteOps", version="0.4.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
-_channel_router = ChannelIntakeRouter()
+_channel_router = ChannelIntakeRouter(settings.quoteops_webhook_secret)
 
 
 @app.get("/")
@@ -177,6 +177,14 @@ async def quote_deliver(request: dict) -> JSONResponse:
 @app.post("/api/intake/channel")
 async def channel_intake(request: dict) -> JSONResponse:
     channel = str(request.get("channel") or "web")
+    payload = request.get("payload") or {}
+    return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
+
+
+@app.post("/api/mcp/quoteops_intake")
+async def mcp_quoteops_intake(request: dict) -> JSONResponse:
+    """Typed bridge for an authorized MCP client; no arbitrary tool execution."""
+    channel = str(request.get("channel") or "chatgpt_mcp")
     payload = request.get("payload") or {}
     return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
 
