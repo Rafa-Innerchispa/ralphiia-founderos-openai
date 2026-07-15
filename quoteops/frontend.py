@@ -135,7 +135,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
           <div class="field"><label for="customer_name">Customer name</label><input id="customer_name" value="Ana" placeholder="Cliente" /></div>
         </div>
         <div class="row">
-          <div class="field"><label for="contact">Contact</label><input id="contact" value="ana@example.com" placeholder="Email o teléfono" /></div>
+          <div class="field"><label for="contact">Contact</label><input id="contact" value="ana@example.com" placeholder="Email o teléfono" maxlength="200" pattern="(?:\+?[0-9][0-9 .()\-]{6,19}|[^@\s]+@[^@\s]+\.[^@\s]+)" /></div>
           <div class="field"><label for="attachments">Attachments</label><input id="attachments" value="brief.pdf,chat.png" placeholder="archivos separados por coma" /></div>
         </div>
         <div class="field"><label for="original_text">Original text</label><textarea id="original_text">Necesito una cotización para automatizar WhatsApp, PDFs y seguimiento de entrega.</textarea></div>
@@ -169,7 +169,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
         <span class="eyebrow">Trust anchor · Owner mode</span>
         <h2 style="margin-top:16px;">Verificar empresa por RUC</h2>
         <p class="sub">Intuito confirma la identidad; RalphiIA y Contífico aportan contexto. Nada se modifica sin aprobación.</p>
-        <div class="field"><label for="rucInput">RUC ecuatoriano</label><input id="rucInput" value="0992364866001" inputmode="numeric" maxlength="13" /></div>
+        <div class="field"><label for="rucInput">RUC ecuatoriano</label><input id="rucInput" value="0992364866001" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" required /><div class="small" id="rucValidationHint">13 dígitos requeridos.</div></div>
         <div class="btn-row">
           <button class="primary" id="rucLookupBtn">Consultar y comparar</button>
           <button class="ghost" id="rucNewBtn">Probar RUC nuevo</button>
@@ -354,7 +354,34 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       });
     }
 
+    function validateRucInput(value) {
+      const normalized = String(value || '').trim();
+      if (!/^[0-9]{13}$/.test(normalized)) return 'El RUC debe contener exactamente 13 dígitos.';
+      return '';
+    }
+
+    function validateContactInput(value) {
+      const normalized = String(value || '').trim();
+      if (!normalized) return 'El contacto es obligatorio.';
+      const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+      const phone = /^\+?[0-9][0-9 .()\-]{6,19}$/;
+      return email.test(normalized) || phone.test(normalized) ? '' : 'Usa un correo o teléfono válido.';
+    }
+
+    function validateIntakeForm() {
+      const errors = [];
+      if (!document.getElementById('customer_name').value.trim()) errors.push('Nombre');
+      if (validateContactInput(document.getElementById('contact').value)) errors.push('Contacto');
+      if (!document.getElementById('original_text').value.trim()) errors.push('Solicitud');
+      return errors;
+    }
+
     async function lookupRuc(forceRefresh = false) {
+      const rucError = validateRucInput(document.getElementById('rucInput').value);
+      const hint = document.getElementById('rucValidationHint');
+      hint.textContent = rucError || 'Formato local válido; se verificará con Intuito.';
+      hint.className = rucError ? 'small' : 'small verified';
+      if (rucError) { rucJson.textContent = rucError; return; }
       rucConfirmBtn.disabled = true;
       rucJson.textContent = 'Consultando Intuito y reconciliando fuentes...';
       try {
@@ -403,6 +430,8 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     }
 
     async function analyze(endpoint) {
+      const validationErrors = validateIntakeForm();
+      if (validationErrors.length) { analysisHint.textContent = `Campos inválidos: ${validationErrors.join(', ')}`; return; }
       const payload = {
         source_channel: document.getElementById('source_channel').value,
         customer_name: document.getElementById('customer_name').value,
@@ -428,6 +457,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       lookupRuc(true);
     });
     rucConfirmBtn.addEventListener('click', confirmRuc);
+    document.getElementById('rucInput').addEventListener('input', (event) => { event.target.value = event.target.value.replace(/[^0-9]/g, '').slice(0, 13); });
 
     renderTimeline('analysis');
     refreshReuse();

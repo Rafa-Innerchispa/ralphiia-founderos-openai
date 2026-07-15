@@ -1,13 +1,30 @@
 from typing import Literal
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 
 
 class QuoteIntake(BaseModel):
-    source_channel: Literal["whatsapp", "web", "sandbox"] = "sandbox"
-    customer_name: str = Field(default="", description="Nombre del cliente o solicitante")
-    contact: str = Field(default="", description="Teléfono, correo o referencia")
-    original_text: str = Field(default="", description="Texto crudo del mensaje o transcripción")
-    attachments: list[str] = Field(default_factory=list)
+    source_channel: Literal["whatsapp", "telegram", "chatgpt_mcp", "web", "sandbox"] = "sandbox"
+    customer_name: str = Field(default="", max_length=200, description="Nombre del cliente o solicitante")
+    contact: str = Field(default="", max_length=200, description="Teléfono, correo o referencia")
+    original_text: str = Field(default="", max_length=10000, description="Texto crudo del mensaje o transcripción")
+    attachments: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("customer_name", "contact", "original_text", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return str(value or "").strip()
+
+    @field_validator("contact")
+    @classmethod
+    def validate_contact(cls, value: str) -> str:
+        if not value:
+            return value
+        email = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+        phone = r"^\+?[0-9][0-9 .()-]{6,19}$"
+        if not re.fullmatch(email, value) and not re.fullmatch(phone, value):
+            raise ValueError("contact debe ser un correo o telefono valido")
+        return value
 
 
 class MissingInformation(BaseModel):
@@ -79,9 +96,16 @@ class QuoteToolPlan(BaseModel):
 
 
 class RucLookupRequest(BaseModel):
-    ruc: str
+    ruc: str = Field(min_length=13, max_length=13)
     force_refresh: bool = False
     mode: Literal["owner", "sandbox"] = "owner"
+
+    @field_validator("ruc")
+    @classmethod
+    def validate_ruc_digits(cls, value: str) -> str:
+        if not re.fullmatch(r"[0-9]{13}", value.strip()):
+            raise ValueError("ruc debe contener exactamente 13 digitos")
+        return value.strip()
 
 
 class TaxpayerEstablishment(BaseModel):
@@ -153,9 +177,16 @@ class RucLookupResult(BaseModel):
 
 
 class RucConfirmRequest(BaseModel):
-    ruc: str
+    ruc: str = Field(min_length=13, max_length=13)
     approved_by: str = Field(min_length=2, max_length=120)
-    expected_verification_id: str
+    expected_verification_id: str = Field(min_length=5, max_length=80)
+
+    @field_validator("ruc")
+    @classmethod
+    def validate_ruc_digits(cls, value: str) -> str:
+        if not re.fullmatch(r"[0-9]{13}", value.strip()):
+            raise ValueError("ruc debe contener exactamente 13 digitos")
+        return value.strip()
 
 
 class RucConfirmationResult(BaseModel):
