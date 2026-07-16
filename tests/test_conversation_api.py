@@ -40,6 +40,8 @@ class TestConversationApi(unittest.TestCase):
         self.assertNotIn("Intake Composer", body)
         self.assertNotIn("Preview fallback", body)
         self.assertNotIn("sandbox safe", body)
+        self.assertIn("Condiciones comerciales", body)
+        self.assertIn("Commercial settings", body)
 
     def test_cedula_lookup_does_not_call_ruc_provider(self):
         key = f"identity-{uuid4()}"
@@ -97,6 +99,16 @@ class TestConversationApi(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["detail"]["code"], "validation_error")
         self.assertIn("Review", response.json()["detail"]["message"])
+
+    def test_commercial_profile_api_and_read_only_sourcing_contract(self):
+        mission = self.client.post("/api/conversation/messages", json={"idempotency_key": f"commercial-api-{uuid4()}", "message": "Start commercial case."}).json()
+        body = {"idempotency_key": f"commercial-profile-{uuid4()}", "language": "en", "profile": {"party_role": "customer", "party_name": "Client Co", "party_type": "business", "category": "key", "terms": {"payment_mode": "transfer", "credit_status": "unverified", "notes": "No inferred credit"}}}
+        saved = self.client.put(f"/api/conversation/missions/{mission['mission_id']}/commercial-profiles", json=body)
+        read = self.client.get(f"/api/conversation/missions/{mission['mission_id']}/sourcing-recommendations?language=en")
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["profile"]["party_name"], "Client Co")
+        self.assertEqual(read.status_code, 200)
+        self.assertIn("recommendations", read.json())
 
     def test_whatsapp_and_chatgpt_continue_the_same_mission_idempotently(self):
         event_id = f"wa-{uuid4()}"

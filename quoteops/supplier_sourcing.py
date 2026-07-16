@@ -72,6 +72,8 @@ class SupplierOffer:
     payment_mode: str | None = None
     credit_days: int | None = None
     credit_status: str = CREDIT_UNVERIFIED
+    credit_source: str | None = None
+    credit_confirmed_date: date | str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "canonical_item_id", (self.canonical_item_id or "").strip())
@@ -80,6 +82,8 @@ class SupplierOffer:
             object.__setattr__(self, name, _decimal(getattr(self, name)))
         if isinstance(self.valid_until, str):
             object.__setattr__(self, "valid_until", date.fromisoformat(self.valid_until))
+        if isinstance(self.credit_confirmed_date, str) and self.credit_confirmed_date:
+            object.__setattr__(self, "credit_confirmed_date", date.fromisoformat(self.credit_confirmed_date))
         if self.tax_status not in {"known", "unknown"}:
             raise ValueError("tax_status must be 'known' or 'unknown'")
         if self.availability not in {"available", "unavailable", "unknown", None}:
@@ -96,6 +100,7 @@ class SupplierOffer:
             self.tax_amount, self.tax_status, self.shipping_cost, self.other_cost,
             self.availability, self.stock_quantity, self.lead_time_days, self.valid_until,
             self.source, self.evidence, self.payment_mode, self.credit_days, self.credit_status,
+            self.credit_source, self.credit_confirmed_date,
         )
         return sha256("|".join("" if part is None else str(part) for part in parts).encode()).hexdigest()
 
@@ -168,7 +173,7 @@ def rank_offers(offers: Iterable[SupplierOffer], *, as_of: date | None = None) -
     return tuple(sorted(
         evaluations,
         key=lambda item: (
-            not item.eligible, item.landed_total is None, item.landed_total or Decimal("0"),
+            not item.eligible, item.landed_unit_cost is None, item.landed_unit_cost or Decimal("0"),
             item.offer.supplier_party_id or "", normalize_name(item.offer.supplier_name),
             item.offer.supplier_reference or "", item.offer.offer_id,
         ),
@@ -184,7 +189,11 @@ def recommend_offer(
     policy = _decimal(max_credit_premium_pct)
     if policy is None or policy < 0:
         raise ValueError("max_credit_premium_pct must be a non-negative number")
-    ranked = rank_offers(offers, as_of=as_of)
+    raw_offers = tuple(offers)
+    item_ids = {offer.canonical_item_id for offer in raw_offers}
+    if len(item_ids) > 1:
+        raise ValueError("mixed_canonical_item_ids")
+    ranked = rank_offers(raw_offers, as_of=as_of)
     item_id = ranked[0].offer.canonical_item_id if ranked else ""
     valid = [item for item in ranked if item.eligible]
     cheapest = valid[0] if valid else None
@@ -193,8 +202,8 @@ def recommend_offer(
     recommended = cheapest
     reason = "no_eligible_offer" if cheapest is None else "lowest_landed_cost"
     if cheapest and confirmed:
-        delta = confirmed.landed_total - cheapest.landed_total  # type: ignore[operator]
-        percent = Decimal("0") if cheapest.landed_total == 0 else delta / cheapest.landed_total * Decimal("100")
+        delta = confirmed.landed_unit_cost - cheapest.landed_unit_cost  # type: ignore[operator]
+        percent = Decimal("0") if cheapest.landed_unit_cost == 0 else delta / cheapest.landed_unit_cost * Decimal("100")
         if percent <= policy:
             recommended, reason = confirmed, "current_confirmed_credit_within_policy"
         else:

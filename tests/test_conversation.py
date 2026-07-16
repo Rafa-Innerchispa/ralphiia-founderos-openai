@@ -4,12 +4,17 @@ import unittest
 from quoteops.adapters.quote_execution import QuoteExecutionService
 from quoteops.conversation import ConversationService
 from quoteops.contracts import (
+    CommercialPartyProfile,
+    CommercialPaymentTerms,
+    CommercialProfileUpsertRequest,
     ConversationAttachment,
     ConversationMessageRequest,
     EditableQuoteLine,
     MissionApprovalRequest,
     MissionDeliveryRequest,
     QuoteUpdateRequest,
+    SupplierOfferCreateRequest,
+    SupplierOfferLineInput,
 )
 from quoteops.settings import Settings
 
@@ -22,6 +27,26 @@ class TestConversationService(unittest.TestCase):
             mongo_uri="mongodb://127.0.0.1:1/",
         )
         self.service = ConversationService(self.settings, persist=False)
+
+    def test_commercial_profiles_are_idempotent_and_confirmed_credit_is_projected(self):
+        mission = self.service.message(ConversationMessageRequest(idempotency_key="commercial-mission-0001", message="Need a sourced item."))
+        profile_request = CommercialProfileUpsertRequest(
+            idempotency_key="commercial-profile-0001", language="en",
+            max_credit_premium_pct=4,
+            profile=CommercialPartyProfile(party_role="supplier", party_id="supplier-1", party_name="Acme Supply", party_type="distributor", category="preferred", terms=CommercialPaymentTerms(payment_mode="net", credit_days=30, credit_status="current_confirmed", confirmation_source="signed terms", confirmed_date="2026-07-16")),
+        )
+        first = self.service.upsert_commercial_profile(mission.mission_id, profile_request)
+        replay = self.service.upsert_commercial_profile(mission.mission_id, profile_request)
+        self.assertFalse(first["idempotent_replay"])
+        self.assertTrue(replay["idempotent_replay"])
+        self.service.add_supplier_offer(mission.mission_id, SupplierOfferCreateRequest(
+            idempotency_key="commercial-offer-0001", language="en", supplier_name="Acme Supply", supplier_party_id="supplier-1", supplier_reference="A-1", tax_amount=0, tax_status="known", shipping_cost=0, other_cost=0, availability="available", lines=[SupplierOfferLineInput(sku="X-1", description="Exact item", quantity=1, unit_cost=100)]
+        ))
+        results = self.service.get_sourcing_recommendations(mission.mission_id)["recommendations"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["best_confirmed_credit_offer"]["supplier_party_id"], "supplier-1")
+        self.assertEqual(results[0]["recommended_offer"]["supplier_party_id"], "supplier-1")
+        self.assertEqual(results[0]["policy_max_credit_premium_pct"], "4.0")
 
     def test_femar_builds_progressive_dossier_with_real_attachment_metadata(self):
         result = self.service.message(

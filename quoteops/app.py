@@ -23,6 +23,7 @@ from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize_ec_identifier
 from quoteops.contracts import (
     CatalogDraftReviewRequest,
+    CommercialProfileUpsertRequest,
     ChannelEventEnvelope,
     ConfigurationAlternativeUpsertRequest,
     ConfigurationReviewRequest,
@@ -264,6 +265,26 @@ async def conversation_supplier_offer(
         raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.put("/api/conversation/missions/{mission_id}/commercial-profiles")
+async def conversation_commercial_profile(
+    mission_id: str, request: CommercialProfileUpsertRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.upsert_commercial_profile(mission_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.get("/api/conversation/missions/{mission_id}/sourcing-recommendations")
+async def conversation_sourcing_recommendations(mission_id: str, language: str = "es") -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.get_sourcing_recommendations(mission_id, language))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", language)) from exc
 
 
 @app.post("/api/conversation/missions/{mission_id}/evidence/extractions")

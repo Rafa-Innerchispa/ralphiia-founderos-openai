@@ -41,6 +41,17 @@ class SupplierSourcingTests(unittest.TestCase):
         self.assertEqual(evaluated.landed_total, Decimal("28"))
         self.assertEqual(evaluated.landed_unit_cost, Decimal("14"))
 
+    def test_ranking_uses_landed_unit_cost_when_quantities_differ(self):
+        bulk = offer(supplier_party_id="bulk", supplier_reference="B", unit_cost="8", quantity="100", tax_amount="0", shipping_cost="0", other_cost="0")
+        small = offer(supplier_party_id="small", supplier_reference="S", unit_cost="9", quantity="1", tax_amount="0", shipping_cost="0", other_cost="0")
+        result = recommend_offer([bulk, small], as_of=date(2026, 7, 16))
+        self.assertEqual(result.lowest_cost_offer.offer.supplier_party_id, "bulk")
+        self.assertEqual(result.lowest_cost_offer.landed_unit_cost, Decimal("8"))
+
+    def test_mixed_canonical_items_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "mixed_canonical_item_ids"):
+            recommend_offer([offer(), offer(canonical_item_id="SKU-2", supplier_reference="other")])
+
     def test_expired_and_insufficient_stock_are_ineligible(self):
         expired = rank_offers([offer(valid_until="2026-07-15")], as_of=date(2026, 7, 16))[0]
         stock = rank_offers([offer(stock_quantity="1")], as_of=date(2026, 7, 16))[0]

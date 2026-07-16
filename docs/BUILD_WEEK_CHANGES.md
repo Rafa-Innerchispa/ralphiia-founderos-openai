@@ -74,3 +74,10 @@
 - Added photography-specific A/B/C framing and editable quote lines whose selling prices remain zero until a human provides them.
 - Added a generic fallback path so an unrelated project never inherits the FEMAR title, access-point questions, or access-control package descriptions.
 - Preserved FEMAR behavior and added regression coverage for project isolation, ES/EN translation, progressive facts, idempotency, and zero-price quote creation.
+
+## Commercial terms and supplier comparison
+
+- Added typed, bilingual-neutral customer and supplier commercial profiles with idempotent mission/staging upserts.
+- Added explicit credit states, exact supplier-profile matching, a configurable 5% confirmed-credit preference, and warning-only historical credit.
+- Added deterministic per-item supplier comparison by landed unit cost; unknown tax, shipping, availability, stock, validity, and other costs remain explicit and never trigger purchasing.
+- Added typed HTTP and MCP profile/recommendation surfaces plus compact ES/EN commercial settings and supplier-comparison UI.

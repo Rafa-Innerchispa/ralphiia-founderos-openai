@@ -296,6 +296,46 @@ class DossierCustomer(BaseModel):
     source: str = ""
 
 
+CreditStatus = Literal["current_confirmed", "historical_observed", "unverified", "unavailable"]
+PartyRole = Literal["customer", "supplier"]
+
+
+class CommercialPaymentTerms(BaseModel):
+    payment_mode: str = Field(default="", max_length=120)
+    credit_days: int | None = Field(default=None, ge=0, le=3650)
+    credit_status: CreditStatus = "unverified"
+    credit_limit: float | None = Field(default=None, ge=0)
+    payment_behavior_or_risk: str = Field(default="", max_length=500)
+    preference_or_quality: str = Field(default="", max_length=500)
+    confirmation_source: str = Field(default="", max_length=300)
+    confirmed_date: str = Field(default="", max_length=40)
+    notes: str = Field(default="", max_length=2000)
+
+
+class CommercialPartyProfile(BaseModel):
+    profile_id: str = ""
+    party_role: PartyRole
+    party_id: str = Field(default="", max_length=160)
+    party_name: str = Field(default="", max_length=200)
+    party_type: str = Field(default="", max_length=120)
+    category: str = Field(default="", max_length=120)
+    terms: CommercialPaymentTerms = Field(default_factory=CommercialPaymentTerms)
+
+
+class CommercialProfileUpsertRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    profile: CommercialPartyProfile
+    max_credit_premium_pct: float | None = Field(default=None, ge=0, le=100)
+
+
+class CommercialProfileUpsertResult(BaseModel):
+    ok: bool = True
+    mission_id: str
+    profile: CommercialPartyProfile
+    idempotent_replay: bool = False
+
+
 class DossierSite(BaseModel):
     location: str = ""
     access_points: str = ""
@@ -387,6 +427,7 @@ class SupplierOfferCreateRequest(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=120)
     language: LanguageCode = "es"
     supplier_name: str = Field(min_length=2, max_length=200)
+    supplier_party_id: str = Field(default="", max_length=160)
     supplier_reference: str = Field(min_length=2, max_length=200)
     currency: Literal["USD"] = "USD"
     tax_included: bool | None = None
@@ -395,6 +436,18 @@ class SupplierOfferCreateRequest(BaseModel):
     attachment_storage_id: str = Field(default="", max_length=120)
     attachment_sha256: str = Field(default="", max_length=64, pattern=r"^(?:|[a-f0-9]{64})$")
     notes: str = Field(default="", max_length=1000)
+    payment_mode: str = Field(default="", max_length=120)
+    credit_days: int | None = Field(default=None, ge=0, le=3650)
+    credit_status: CreditStatus = "unverified"
+    credit_source: str = Field(default="", max_length=300)
+    credit_confirmed_date: str = Field(default="", max_length=40)
+    tax_amount: float | None = Field(default=None, ge=0)
+    tax_status: Literal["known", "unknown"] = "unknown"
+    shipping_cost: float | None = Field(default=None, ge=0)
+    other_cost: float | None = Field(default=None, ge=0)
+    availability: Literal["available", "unavailable", "unknown"] = "unknown"
+    stock_quantity: float | None = Field(default=None, ge=0)
+    lead_time_days: int | None = Field(default=None, ge=0, le=3650)
     lines: list[SupplierOfferLineInput] = Field(min_length=1, max_length=100)
 
     @field_validator(
@@ -429,6 +482,7 @@ class SupplierOfferLine(BaseModel):
 class SupplierOffer(BaseModel):
     offer_id: str
     supplier_name: str
+    supplier_party_id: str = ""
     supplier_reference: str
     currency: Literal["USD"] = "USD"
     tax_included: bool | None = None
@@ -437,9 +491,44 @@ class SupplierOffer(BaseModel):
     attachment_storage_id: str = ""
     attachment_sha256: str = ""
     notes: str = ""
+    payment_mode: str = ""
+    credit_days: int | None = None
+    credit_status: CreditStatus = "unverified"
+    credit_source: str = ""
+    credit_confirmed_date: str = ""
+    tax_amount: float | None = None
+    tax_status: Literal["known", "unknown"] = "unknown"
+    shipping_cost: float | None = None
+    other_cost: float | None = None
+    availability: Literal["available", "unavailable", "unknown"] = "unknown"
+    stock_quantity: float | None = None
+    lead_time_days: int | None = None
     total_cost: float = Field(ge=0)
     evidence_status: Literal["reference", "attachment", "reference_and_attachment"] = "reference"
     lines: list[SupplierOfferLine] = Field(default_factory=list)
+
+
+class SourcingOfferSummary(BaseModel):
+    supplier_party_id: str | None = None
+    supplier_name: str | None = None
+    supplier_reference: str | None = None
+    landed_unit_cost: str | None = None
+    eligible: bool
+    reasons: list[str] = Field(default_factory=list)
+    credit_status: CreditStatus = "unverified"
+    unknown_facts: list[str] = Field(default_factory=list)
+
+
+class SupplierSourcingRecommendation(BaseModel):
+    canonical_item_id: str
+    lowest_cost_offer: SourcingOfferSummary | None = None
+    best_confirmed_credit_offer: SourcingOfferSummary | None = None
+    recommended_offer: SourcingOfferSummary | None = None
+    recommendation_reason: str = "no_eligible_offer"
+    absolute_delta: str | None = None
+    percentage_delta: str | None = None
+    policy_max_credit_premium_pct: str = "5"
+    alternatives: list[SourcingOfferSummary | None] = Field(default_factory=list)
 
 
 class CatalogDraftItem(BaseModel):
@@ -759,6 +848,7 @@ class DecisionWorkspace(BaseModel):
 class ContextDossier(BaseModel):
     project: ProjectProfile = Field(default_factory=ProjectProfile)
     customer: DossierCustomer = Field(default_factory=DossierCustomer)
+    commercial_profiles: list[CommercialPartyProfile] = Field(default_factory=list)
     site: DossierSite = Field(default_factory=DossierSite)
     confirmed_scope: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
@@ -766,6 +856,8 @@ class ContextDossier(BaseModel):
     questions: list[str] = Field(default_factory=list)
     options: list[DossierOption] = Field(default_factory=list)
     supplier_offers: list[SupplierOffer] = Field(default_factory=list)
+    sourcing_recommendations: list[SupplierSourcingRecommendation] = Field(default_factory=list)
+    sourcing_policy_max_credit_premium_pct: float = Field(default=5, ge=0, le=100)
     catalog_drafts: list[CatalogDraftItem] = Field(default_factory=list)
     extracted_evidence: list[MultimodalEvidence] = Field(default_factory=list)
     decision_workspace: DecisionWorkspace = Field(default_factory=DecisionWorkspace)

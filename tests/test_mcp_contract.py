@@ -31,6 +31,8 @@ class TestQuoteOpsMcpContract(unittest.TestCase):
         self.assertIn("quoteops_update_decision_brief", names)
         self.assertIn("quoteops_upsert_configuration_alternative", names)
         self.assertIn("quoteops_review_configuration_alternative", names)
+        self.assertIn("quoteops_upsert_commercial_profile", names)
+        self.assertIn("quoteops_get_sourcing_recommendations", names)
         self.assertNotIn("shell", names)
         self.assertNotIn("mongo_query", names)
 
@@ -84,6 +86,13 @@ class TestQuoteOpsMcpContract(unittest.TestCase):
         self.assertIn("original_source_not_archived", first["evidence"]["warnings"])
         self.assertTrue(second["idempotent_replay"])
         self.assertEqual(first["evidence"]["evidence_id"], second["evidence"]["evidence_id"])
+
+    def test_commercial_profile_and_sourcing_read_tools(self):
+        mission = self.rpc("tools/call", {"name": "quoteops_start_or_continue_mission", "arguments": {"idempotency_key": f"mcp-commercial-{uuid4()}", "message": "Commercial comparison case."}}).json()["result"]["structuredContent"]
+        saved = self.rpc("tools/call", {"name": "quoteops_upsert_commercial_profile", "arguments": {"mission_id": mission["mission_id"], "idempotency_key": f"mcp-profile-{uuid4()}", "profile": {"party_role": "supplier", "party_id": "mcp-supplier", "party_name": "MCP Supplier", "terms": {"credit_status": "historical_observed"}}}}).json()["result"]["structuredContent"]
+        read = self.rpc("tools/call", {"name": "quoteops_get_sourcing_recommendations", "arguments": {"mission_id": mission["mission_id"], "language": "en"}}).json()["result"]["structuredContent"]
+        self.assertEqual(saved["profile"]["party_id"], "mcp-supplier")
+        self.assertEqual(read["recommendations"], [])
 
 
 if __name__ == "__main__":

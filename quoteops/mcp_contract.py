@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from quoteops.contracts import (
     CatalogDraftReviewRequest,
+    CommercialProfileUpsertRequest,
     ConfigurationAlternativeUpsertRequest,
     ConfigurationReviewRequest,
     ConversationMessageRequest,
@@ -55,6 +56,19 @@ MCP_TOOLS = [
             },
             "required": ["mission_id"],
             "additionalProperties": False,
+        },
+    },
+    {
+        "name": "quoteops_upsert_commercial_profile",
+        "description": "Idempotently store customer or supplier commercial terms in the isolated QuoteOps mission and staging collection.",
+        "inputSchema": _with_mission_id(CommercialProfileUpsertRequest.model_json_schema()),
+    },
+    {
+        "name": "quoteops_get_sourcing_recommendations",
+        "description": "Read deterministic supplier comparisons and recommendations. This never places a purchase or invents commercial facts.",
+        "inputSchema": {
+            "type": "object", "properties": {"mission_id": {"type": "string", "pattern": r"^mission_[a-f0-9]{18}$"}, "language": {"type": "string", "enum": ["es", "en"], "default": "es"}},
+            "required": ["mission_id"], "additionalProperties": False,
         },
     },
     {
@@ -196,6 +210,8 @@ class QuoteOpsMcpContract:
                     str(args.get("mission_id") or ""),
                     str(args.get("language") or "es"),
                 ).model_dump()
+            if name == "quoteops_get_sourcing_recommendations":
+                return self.conversation.get_sourcing_recommendations(str(args.get("mission_id") or ""), str(args.get("language") or "es"))
             mission_id = str(args.pop("mission_id", ""))
             if not mission_id:
                 return {"ok": False, "error": "mission_id_required"}
@@ -203,6 +219,10 @@ class QuoteOpsMcpContract:
                 return self.conversation.add_supplier_offer(
                     mission_id,
                     SupplierOfferCreateRequest.model_validate(args),
+                )
+            if name == "quoteops_upsert_commercial_profile":
+                return self.conversation.upsert_commercial_profile(
+                    mission_id, CommercialProfileUpsertRequest.model_validate(args)
                 )
             if name == "quoteops_record_extracted_evidence":
                 return self.conversation.record_extracted_evidence(

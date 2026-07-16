@@ -9,7 +9,7 @@
 - Canonical repository: `/home/rlopez/projects/ralphiia-quoteops`
 - Role: QuoteOps writer; Astro is owned by Gemini/Visual Code through a separate repository
 - Runtime safety: staging only; production writes disabled; Smart Quoter `:2026` read-only
-- Current status: multibusiness project profiles are verified on canonical staging `:8765`; 57/57 full-host tests pass, FEMAR remains isolated, a photography-workshop mission now has its own bilingual questions and editable zero-price quote, and no production writes occurred
+- Current status: commercial customer/supplier profiles and deterministic per-item supplier comparisons are implemented in isolated QuoteOps staging; no purchase action, production write, service restart, or ICO PDF ingestion occurred in this increment.
 - Baseline commit: `efa08e5`
 - Current increment base: `a265c05`
 - Current functional commits: `b1d8d57` (project profiles) and `6389879` (bilingual quote lines)

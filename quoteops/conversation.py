@@ -13,6 +13,8 @@ from pymongo import MongoClient
 
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize_ec_identifier
 from quoteops.contracts import (
+    CommercialPartyProfile,
+    CommercialProfileUpsertRequest,
     ContextDossier,
     CatalogDraftReviewRequest,
     ConfigurationAlternative,
@@ -38,6 +40,7 @@ from quoteops.contracts import (
     SupplierOffer,
     SupplierOfferCreateRequest,
 )
+from quoteops.supplier_sourcing import SupplierOffer as SourcingOffer, recommend_offer, normalize_name
 
 
 TEXT = {
@@ -201,6 +204,7 @@ class ConversationService:
         self.operations = None
         self.tasks = None
         self.catalog = None
+        self.commercial_profiles = None
         if persist:
             self._connect_mongo()
 
@@ -218,10 +222,12 @@ class ConversationService:
             self.operations = db["conversation_operations"]
             self.tasks = db["conversation_tasks"]
             self.catalog = db["conversation_catalog"]
+            self.commercial_profiles = db["conversation_commercial_profiles"]
             self.collection.create_index("mission_id", unique=True)
             self.operations.create_index("idempotency_key", unique=True)
             self.tasks.create_index("task_id", unique=True)
             self.catalog.create_index("canonical_item_id", unique=True)
+            self.commercial_profiles.create_index([("mission_id", 1), ("party_role", 1), ("profile_id", 1)], unique=True)
             self.mongo_client = client
         except Exception:
             if client is not None:
@@ -408,6 +414,7 @@ class ConversationService:
             offer = SupplierOffer(
                 offer_id=offer_id,
                 supplier_name=request.supplier_name,
+                supplier_party_id=request.supplier_party_id,
                 supplier_reference=request.supplier_reference,
                 currency=request.currency,
                 tax_included=request.tax_included,
@@ -416,12 +423,25 @@ class ConversationService:
                 attachment_storage_id=request.attachment_storage_id,
                 attachment_sha256=request.attachment_sha256,
                 notes=request.notes,
+                payment_mode=request.payment_mode,
+                credit_days=request.credit_days,
+                credit_status=request.credit_status,
+                credit_source=request.credit_source,
+                credit_confirmed_date=request.credit_confirmed_date,
+                tax_amount=request.tax_amount,
+                tax_status=request.tax_status,
+                shipping_cost=request.shipping_cost,
+                other_cost=request.other_cost,
+                availability=request.availability,
+                stock_quantity=request.stock_quantity,
+                lead_time_days=request.lead_time_days,
                 total_cost=round(sum(item["line_cost"] for item in lines), 2),
                 evidence_status=evidence_status,
                 lines=lines,
             ).model_dump()
             mission["language"] = request.language
             mission["dossier"].setdefault("supplier_offers", []).append(offer)
+            self._refresh_sourcing_recommendations(mission)
             self._add_event(mission, "supplier_offer_added", f"Supplier evidence {offer_id} recorded")
             self._refresh_options(mission)
             self._set_progress_and_phase(mission)
@@ -436,6 +456,46 @@ class ConversationService:
             }
             self._save_operation(request.idempotency_key, mission_id, "supplier_offer", response)
             return response
+
+    def upsert_commercial_profile(self, mission_id: str, request: CommercialProfileUpsertRequest) -> dict[str, Any]:
+        """Idempotently store commercial terms only in the mission and QuoteOps staging."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            profile = request.profile.model_dump()
+            profile["profile_id"] = profile["profile_id"] or self._profile_id(profile)
+            profiles = mission["dossier"].setdefault("commercial_profiles", [])
+            profiles[:] = [item for item in profiles if item.get("profile_id") != profile["profile_id"]]
+            profiles.append(profile)
+            profiles.sort(key=lambda item: (item.get("party_role", ""), item.get("profile_id", "")))
+            if profile["party_role"] == "customer":
+                customer = mission["dossier"].setdefault("customer", {})
+                if profile.get("party_name") and not customer.get("name"):
+                    customer["name"] = profile["party_name"]
+                if profile.get("party_id") and not customer.get("identifier"):
+                    customer["identifier"] = profile["party_id"]
+                    customer["source"] = customer.get("source") or "commercial_profile"
+            if self.commercial_profiles is not None:
+                self.commercial_profiles.replace_one(
+                    {"mission_id": mission_id, "party_role": profile["party_role"], "profile_id": profile["profile_id"]},
+                    {"mission_id": mission_id, **profile}, upsert=True,
+                )
+            mission["language"] = request.language
+            if request.max_credit_premium_pct is not None:
+                mission["dossier"]["sourcing_policy_max_credit_premium_pct"] = request.max_credit_premium_pct
+            self._refresh_sourcing_recommendations(mission)
+            self._save_mission(mission)
+            response = {"ok": True, "mission_id": mission_id, "profile": profile, "dossier": mission["dossier"], "idempotent_replay": False}
+            self._save_operation(request.idempotency_key, mission_id, "commercial_profile", response)
+            return response
+
+    def get_sourcing_recommendations(self, mission_id: str, language: str = "es") -> dict[str, Any]:
+        with self._lock:
+            mission = self._require_mission(mission_id)
+            self._refresh_sourcing_recommendations(mission)
+            return {"ok": True, "mission_id": mission_id, "language": language, "policy_max_credit_premium_pct": mission["dossier"].get("sourcing_policy_max_credit_premium_pct", 5), "recommendations": mission["dossier"].get("sourcing_recommendations", [])}
 
     def record_extracted_evidence(
         self,
@@ -590,6 +650,7 @@ class ConversationService:
                 )
             mission["language"] = request.language
             self._add_event(mission, "catalog_reviewed", f"Catalog draft {catalog_draft_id} {draft['status']}")
+            self._refresh_sourcing_recommendations(mission)
             self._save_mission(mission)
             response = {**self._response(mission, self._reply(mission)), "catalog_draft": draft}
             self._save_operation(request.idempotency_key, mission_id, "catalog_review", response)
@@ -1768,6 +1829,82 @@ class ConversationService:
         value = sku or description
         ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
         return re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-") or "item"
+
+    @staticmethod
+    def _profile_id(profile: dict[str, Any]) -> str:
+        identity = profile.get("party_id") or normalize_name(profile.get("party_name"))
+        seed = f"{profile.get('party_role', '')}:{identity}"
+        return "commercial_" + sha256(seed.encode()).hexdigest()[:18]
+
+    def _supplier_profile_terms(self, dossier: dict[str, Any], offer: dict[str, Any]) -> dict[str, Any]:
+        """Apply supplier terms only for an exact party ID or one exact normalized-name match."""
+        profiles = [item for item in dossier.get("commercial_profiles", []) if item.get("party_role") == "supplier"]
+        party_id = str(offer.get("supplier_party_id") or "")
+        if party_id:
+            matched = [item for item in profiles if item.get("party_id") == party_id]
+        else:
+            name = normalize_name(str(offer.get("supplier_name") or ""))
+            matched = [item for item in profiles if name and normalize_name(item.get("party_name")) == name]
+        return dict(matched[0].get("terms") or {}) if len(matched) == 1 else {}
+
+    def _refresh_sourcing_recommendations(self, mission: dict[str, Any]) -> None:
+        dossier = mission["dossier"]
+        grouped: dict[str, list[SourcingOffer]] = {}
+        for stored in dossier.get("supplier_offers", []):
+            terms = self._supplier_profile_terms(dossier, stored)
+            source_lines = stored.get("lines", [])
+            single_line = len(source_lines) == 1
+            for line in source_lines:
+                group = str(line.get("canonical_item_id") or "")
+                if not group:
+                    group = "draft:" + str(line.get("catalog_draft_id") or "")
+                if group == "draft:":
+                    sku = self._catalog_key(str(line.get("sku") or ""), "")
+                    group = "sku:" + sku if sku != "item" else ""
+                if not group:
+                    continue
+                # Whole-offer landed facts are only attributable to one line; otherwise remain unknown.
+                def fact(name: str, default=None):
+                    value = stored.get(name)
+                    if name == "credit_status" and value in {"", None, "unverified", "unavailable"} and terms.get(name):
+                        return terms[name]
+                    return value if value not in (None, "") else terms.get(name, default)
+                grouped.setdefault(group, []).append(SourcingOffer(
+                    canonical_item_id=group,
+                    supplier_party_id=stored.get("supplier_party_id") or None,
+                    supplier_name=stored.get("supplier_name") or None,
+                    supplier_reference=stored.get("supplier_reference") or None,
+                    unit_cost=line.get("unit_cost"), quantity=line.get("quantity"), currency=stored.get("currency") or "USD",
+                    tax_amount=fact("tax_amount") if single_line else None,
+                    tax_status=fact("tax_status", "unknown") if single_line else "unknown",
+                    shipping_cost=fact("shipping_cost") if single_line else None,
+                    other_cost=fact("other_cost") if single_line else None,
+                    availability=stored.get("availability") or "unknown", stock_quantity=stored.get("stock_quantity"),
+                    lead_time_days=stored.get("lead_time_days"), valid_until=stored.get("valid_until") or None,
+                    source=stored.get("supplier_reference") or None, evidence=stored.get("attachment_sha256") or None,
+                    payment_mode=fact("payment_mode") or None, credit_days=fact("credit_days"),
+                    credit_status=fact("credit_status", "unverified"), credit_source=fact("credit_source") or None,
+                    credit_confirmed_date=fact("credit_confirmed_date") or None,
+                ))
+        results = []
+        policy = dossier.get("sourcing_policy_max_credit_premium_pct", 5)
+        for group in sorted(grouped):
+            recommendation = recommend_offer(grouped[group], max_credit_premium_pct=policy)
+            def present(value):
+                if value is None:
+                    return None
+                return {"supplier_party_id": value.offer.supplier_party_id, "supplier_name": value.offer.supplier_name,
+                        "supplier_reference": value.offer.supplier_reference, "landed_unit_cost": str(value.landed_unit_cost) if value.landed_unit_cost is not None else None,
+                        "eligible": value.eligible, "reasons": list(value.reasons), "credit_status": value.offer.credit_status,
+                        "unknown_facts": [reason for reason in value.reasons if reason.startswith("unknown_") or reason == "availability_unconfirmed"]}
+            results.append({"canonical_item_id": group, "lowest_cost_offer": present(recommendation.lowest_cost_offer),
+                            "best_confirmed_credit_offer": present(recommendation.best_confirmed_credit_offer),
+                            "recommended_offer": present(recommendation.recommended_offer), "recommendation_reason": recommendation.recommendation_reason,
+                            "absolute_delta": str(recommendation.absolute_delta) if recommendation.absolute_delta is not None else None,
+                            "percentage_delta": str(recommendation.percentage_delta) if recommendation.percentage_delta is not None else None,
+                            "policy_max_credit_premium_pct": str(recommendation.policy_max_credit_premium_pct),
+                            "alternatives": [present(item) for item in recommendation.alternatives]})
+        dossier["sourcing_recommendations"] = results
 
     @classmethod
     def _public_value(cls, value: Any) -> Any:
