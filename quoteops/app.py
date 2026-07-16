@@ -5,7 +5,7 @@ from getpass import getuser
 from pathlib import Path
 from platform import node
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from quoteops.adapters.openai_analysis import analyze_intake, build_fallback_analysis
@@ -26,6 +26,7 @@ from quoteops.contracts import (
 )
 from quoteops.customer_identity import CustomerIdentityService
 from quoteops.frontend import render_cockpit_page
+from quoteops.iess_payments import IessPaymentService
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
@@ -35,6 +36,7 @@ _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
 _channel_router = ChannelIntakeRouter(settings.quoteops_webhook_secret)
 _smart_quoter = SmartQuoterAdapter(settings.smart_quoter_base_url)
+_iess_payments = IessPaymentService(settings)
 
 
 @app.get("/")
@@ -223,6 +225,46 @@ async def whatsapp_webhook(request: dict) -> JSONResponse:
 @app.post("/api/webhooks/telegram")
 async def telegram_webhook(request: dict) -> JSONResponse:
     return JSONResponse(_channel_router.ingest("telegram", request, str(request.get("signature") or "")))
+
+
+def _allow_iess_local_request(request: Request) -> bool:
+    host = request.client.host if request.client else ""
+    provided = request.headers.get("x-quoteops-webhook-secret", "")
+    return host in {"127.0.0.1", "::1", "localhost"} or bool(settings.quoteops_webhook_secret and provided == settings.quoteops_webhook_secret)
+
+
+@app.post("/api/iess/whatsapp-preview")
+async def iess_whatsapp_preview(request: Request) -> JSONResponse:
+    if not _allow_iess_local_request(request):
+        return JSONResponse({"ok": False, "error": "local_or_signed_request_required"}, status_code=403)
+    return JSONResponse(_iess_payments.preview(await request.json()))
+
+
+@app.post("/api/iess/confirm")
+async def iess_confirm(request: Request) -> JSONResponse:
+    if not _allow_iess_local_request(request):
+        return JSONResponse({"ok": False, "error": "local_or_signed_request_required"}, status_code=403)
+    payload = await request.json()
+    return JSONResponse(
+        _iess_payments.confirm(
+            str(payload.get("action_id") or ""),
+            str(payload.get("approved_by") or "RAFAEL"),
+            str(payload.get("request_sender") or ""),
+        )
+    )
+
+
+@app.post("/api/iess/cancel")
+async def iess_cancel(request: Request) -> JSONResponse:
+    if not _allow_iess_local_request(request):
+        return JSONResponse({"ok": False, "error": "local_or_signed_request_required"}, status_code=403)
+    payload = await request.json()
+    return JSONResponse(
+        _iess_payments.cancel(
+            str(payload.get("action_id") or ""),
+            str(payload.get("request_sender") or ""),
+        )
+    )
 
 
 def _get_identity_service() -> CustomerIdentityService:

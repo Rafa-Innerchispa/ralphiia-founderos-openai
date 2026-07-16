@@ -37,6 +37,7 @@ class Settings(BaseModel):
     quoteops_mongo_db: str = os.getenv("QUOTEOPS_MONGO_DB", "ralphiia_quoteops_staging")
     quoteops_artifact_root: str = os.getenv("QUOTEOPS_ARTIFACT_ROOT", "/tmp/ralphiia-quoteops-artifacts")
     quoteops_webhook_secret: str = os.getenv("QUOTEOPS_WEBHOOK_SECRET", "")
+    iess_evidence_root: str = os.getenv("IESS_EVIDENCE_ROOT", "/home/rlopez/data/ralphiia-quoteops/iess-evidence")
     ralfia_package_root: str = os.getenv(
         "RALFIA_PACKAGE_ROOT", "/home/rlopez/projects/raphiia-openai"
     )
