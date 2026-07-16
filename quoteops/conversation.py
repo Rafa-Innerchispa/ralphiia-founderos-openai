@@ -55,6 +55,34 @@ TEXT = {
         "question_site": "¿Dónde está el sitio y cuántos accesos o puertas incluye?",
         "question_existing": "¿Qué marca, modelo y estado tiene el sistema actual?",
         "question_schedule": "¿Qué restricciones operativas y fecha objetivo debemos considerar?",
+        "question_general_scope": "¿Qué resultado debe entregar el proyecto y cómo sabremos que quedó completo?",
+        "question_general_site": "¿Dónde se ejecutará el proyecto y qué infraestructura existe hoy?",
+        "general_option_a": "Alcance esencial",
+        "general_option_a_summary": "Resolver el resultado prioritario con la menor complejidad validada.",
+        "general_option_b": "Flujo automatizado",
+        "general_option_b_summary": "Conectar el proceso principal con automatización y trazabilidad operativa.",
+        "general_option_c": "Operación integrada",
+        "general_option_c_summary": "Integrar el flujo completo por etapas, con controles y aprobación humana.",
+        "photo_title": "Taller fotográfico de {customer}",
+        "photo_summary": "Organización de colecciones, entrega privada, automatización local y gestión de cobros.",
+        "photo_scope_collections": "Organizar colecciones fotográficas y sus metadatos.",
+        "photo_scope_delivery": "Entregar archivos a clientes desde un servidor local con acceso controlado.",
+        "photo_scope_ai": "Evaluar procesamiento o generación local con IA sin asumir capacidad de hardware.",
+        "photo_scope_billing": "Organizar cobros y su seguimiento dentro del flujo del taller.",
+        "photo_risk_server": "Capacidad, respaldo, conectividad y seguridad del servidor local deben verificarse antes de diseñar la entrega.",
+        "photo_risk_ai": "Hardware disponible, privacidad y derechos de uso deben validarse antes de activar IA local.",
+        "photo_question_volume": "¿Cuánto ocupa el archivo actual, cuánto crece al mes y qué formatos conserva?",
+        "photo_question_server": "¿Qué servidor, almacenamiento, respaldo, red y conexión a internet existen hoy?",
+        "photo_question_delivery": "¿Cómo entrega hoy cada colección, cuántos clientes atiende y qué permisos o vencimientos necesita?",
+        "photo_question_billing": "¿Cómo registra cotizaciones, anticipos, saldos, pagos y comprobantes actualmente?",
+        "photo_question_ai": "¿Qué tareas de IA local quiere automatizar y qué CPU o GPU tiene disponible?",
+        "photo_question_schedule": "¿Cuál es el presupuesto, la prioridad y la fecha objetivo para la primera etapa?",
+        "photo_option_a": "Organización esencial",
+        "photo_option_a_summary": "Ordenar el archivo y habilitar entregas privadas con la automatización mínima necesaria.",
+        "photo_option_b": "Flujo automatizado",
+        "photo_option_b_summary": "Integrar ingreso, clasificación, entrega, notificaciones y seguimiento de cobros.",
+        "photo_option_c": "Operación integrada",
+        "photo_option_c_summary": "Orquestar el taller de extremo a extremo e incorporar IA local solo con infraestructura validada.",
         "reply_progress": "Ya incorporé la información al expediente. Para avanzar necesito: {questions}",
         "reply_ready": "El expediente tiene contexto suficiente. Puedes pedirme preparar la cotización editable.",
         "reply_design": "El espacio de decisión está actualizado. Las alternativas deben usar productos y costos con fuente real antes de revisión humana.",
@@ -62,6 +90,8 @@ TEXT = {
         "reply_approved": "La aprobación humana quedó registrada y el PDF real está listo.",
         "reply_delivered": "La entrega quedó registrada con su identificador y trazabilidad.",
         "task_next_input": "Completar identidad, sitio, alcance y evidencia de costos.",
+        "general_task_next_input": "Completar identidad, alcance, infraestructura y evidencia de costos.",
+        "photo_task_next_input": "Completar identidad, volumen, servidor, entrega, cobros y evidencia de costos.",
         "task_next_quote": "Seleccionar un paquete y confirmar precios de venta.",
         "task_next_design": "Completar y revisar las alternativas técnicas con evidencia real.",
         "task_next_approval": "Revisar la cotización y registrar aprobación humana.",
@@ -82,6 +112,34 @@ TEXT = {
         "question_site": "Where is the site and how many doors or access points are included?",
         "question_existing": "What are the brand, model, and condition of the current system?",
         "question_schedule": "Which operating constraints and target date should we consider?",
+        "question_general_scope": "What must the project deliver, and how will we know it is complete?",
+        "question_general_site": "Where will the project run, and what infrastructure is available today?",
+        "general_option_a": "Essential scope",
+        "general_option_a_summary": "Deliver the priority outcome with the least validated complexity.",
+        "general_option_b": "Automated workflow",
+        "general_option_b_summary": "Connect the primary process with automation and operational traceability.",
+        "general_option_c": "Integrated operation",
+        "general_option_c_summary": "Integrate the complete workflow in stages, with controls and human approval.",
+        "photo_title": "{customer} photography workshop",
+        "photo_summary": "Collection organization, private delivery, local automation, and payment management.",
+        "photo_scope_collections": "Organize photography collections and their metadata.",
+        "photo_scope_delivery": "Deliver files to clients from a local server with controlled access.",
+        "photo_scope_ai": "Evaluate local AI processing or generation without assuming hardware capacity.",
+        "photo_scope_billing": "Organize payment tracking within the workshop workflow.",
+        "photo_risk_server": "Local server capacity, backup, connectivity, and security must be verified before designing delivery.",
+        "photo_risk_ai": "Available hardware, privacy, and usage rights must be validated before enabling local AI.",
+        "photo_question_volume": "How large is the current archive, how much does it grow monthly, and which formats are retained?",
+        "photo_question_server": "Which server, storage, backup, network, and internet connection are available today?",
+        "photo_question_delivery": "How is each collection delivered today, how many clients are served, and which permissions or expirations are needed?",
+        "photo_question_billing": "How are quotes, deposits, balances, payments, and receipts tracked today?",
+        "photo_question_ai": "Which local AI tasks should be automated, and which CPU or GPU is available?",
+        "photo_question_schedule": "What are the budget, priority, and target date for the first stage?",
+        "photo_option_a": "Essential organization",
+        "photo_option_a_summary": "Organize the archive and enable private deliveries with the minimum required automation.",
+        "photo_option_b": "Automated workflow",
+        "photo_option_b_summary": "Integrate intake, classification, delivery, notifications, and payment tracking.",
+        "photo_option_c": "Integrated operation",
+        "photo_option_c_summary": "Orchestrate the workshop end to end and add local AI only after infrastructure is validated.",
         "reply_progress": "I added the information to the case file. To continue I need: {questions}",
         "reply_ready": "The case file has enough context. You can ask me to prepare the editable quote.",
         "reply_design": "The decision workspace is updated. Alternatives must use products and costs from real sources before human review.",
@@ -89,6 +147,8 @@ TEXT = {
         "reply_approved": "Human approval was recorded and the real PDF is ready.",
         "reply_delivered": "Delivery was registered with its identifier and trace.",
         "task_next_input": "Complete identity, site, scope, and cost evidence.",
+        "general_task_next_input": "Complete identity, scope, infrastructure, and cost evidence.",
+        "photo_task_next_input": "Complete identity, volume, server, delivery, billing, and cost evidence.",
         "task_next_quote": "Select a package and confirm selling prices.",
         "task_next_design": "Complete and review the technical alternatives with real evidence.",
         "task_next_approval": "Review the quote and record human approval.",
@@ -159,6 +219,7 @@ class ConversationService:
             mission_id = request.mission_id or self._mission_id(request.idempotency_key)
             mission = self._load_mission(mission_id) or self._new_mission(mission_id, request.language)
             mission["language"] = request.language
+            self._refresh_project_profile(mission)
             if mission["dossier"].get("work_item"):
                 mission["dossier"]["work_item"]["source_channel"] = request.source_channel
             workspace = mission["dossier"].setdefault("decision_workspace", {})
@@ -197,6 +258,7 @@ class ConversationService:
                 raise KeyError("mission_not_found")
             if language in TEXT:
                 mission["language"] = language
+                self._refresh_project_profile(mission)
                 self._refresh_questions(mission)
                 self._refresh_options(mission)
                 self._sync_work_item(mission)
@@ -923,6 +985,11 @@ class ConversationService:
         if generic_name and not dossier["customer"]["name"]:
             dossier["customer"]["name"] = generic_name.group(1).strip()
 
+        project = dossier.setdefault("project", {})
+        detected_kind = self._detect_project_kind(text)
+        if detected_kind != "general" or not project.get("kind"):
+            project["kind"] = detected_kind
+
         for candidate in re.findall(r"(?<!\d)(?:\d{13}|\d{10})(?!\d)", text):
             try:
                 identifier, identifier_type = normalize_ec_identifier(candidate)
@@ -944,6 +1011,23 @@ class ConversationService:
         if any(term in lower for term in ("rehabil", "conservar", "existente", "existing", "reuse")):
             self._append_unique(dossier["assumptions"], TEXT[request.language]["assumption"])
             self._append_unique(dossier["risks"], TEXT[request.language]["risk"])
+
+        if project.get("kind") == "photo_workshop":
+            normalized_lower = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").lower()
+            photo_scope_terms = {
+                "photo_scope_collections": ("coleccion", "archivo fotograf", "organizar", "catalog", "collection", "photo archive"),
+                "photo_scope_delivery": ("entrega", "mandar los archivos", "servidor local", "deliver", "client files", "local server"),
+                "photo_scope_ai": ("ia local", "inteligencia artificial local", "generacion local", "local ai", "local generation"),
+                "photo_scope_billing": ("cobro", "pago", "factur", "billing", "payment", "collection tracking"),
+            }
+            for text_key, terms in photo_scope_terms.items():
+                if any(term in normalized_lower for term in terms):
+                    self._append_unique(dossier["confirmed_scope"], TEXT[request.language][text_key])
+            if any(term in normalized_lower for term in ("servidor local", "local server", "entrega", "deliver")):
+                self._append_unique(dossier["risks"], TEXT[request.language]["photo_risk_server"])
+            if any(term in normalized_lower for term in ("ia local", "local ai", "generacion local", "local generation")):
+                self._append_unique(dossier["risks"], TEXT[request.language]["photo_risk_ai"])
+            self._extract_photo_facts(project, text)
 
         location = re.search(
             r"(?:ubicaci[oó]n|sitio|location|site)\s*[:\-]\s*([^\n.]{2,120})",
@@ -970,10 +1054,149 @@ class ConversationService:
             self._refresh_options(mission)
         if any(word in lower for word in ("cotiz", "borrador", "quote", "proposal")) and dossier["confirmed_scope"]:
             dossier["quote"] = dossier.get("quote") or self._quote_draft(dossier, request.language).model_dump()
+        self._refresh_project_profile(mission)
         self._refresh_questions(mission)
         self._set_progress_and_phase(mission)
 
+    @staticmethod
+    def _detect_project_kind(text: str) -> str:
+        lower = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").lower()
+        if any(
+            term in lower
+            for term in (
+                "taller fotograf",
+                "laboratorio fotograf",
+                "archivo fotograf",
+                "photography workshop",
+                "photo workshop",
+                "photo lab",
+                "photography studio",
+            )
+        ):
+            return "photo_workshop"
+        if any(term in lower for term in ("control de acceso", "sistema de acceso", "access control", "access-control")):
+            return "access_control"
+        return "general"
+
+    @staticmethod
+    def _project_kind(dossier: dict[str, Any]) -> str:
+        return str((dossier.get("project") or {}).get("kind") or "general")
+
+    def _refresh_project_profile(self, mission: dict[str, Any]) -> None:
+        dossier = mission["dossier"]
+        project = dossier.setdefault("project", {})
+        project.setdefault("facts", {})
+        kind = str(project.get("kind") or "general")
+        if kind == "general":
+            known_text = " ".join(
+                [
+                    *dossier.get("confirmed_scope", []),
+                    str((dossier.get("work_item") or {}).get("title") or ""),
+                ]
+            )
+            inferred = self._detect_project_kind(known_text)
+            if inferred != "general":
+                kind = inferred
+                project["kind"] = inferred
+        customer = dossier.get("customer", {}).get("name", "").strip()
+        language = mission["language"]
+        if kind == "photo_workshop":
+            self._translate_known_values(
+                dossier["confirmed_scope"],
+                (
+                    "photo_scope_collections",
+                    "photo_scope_delivery",
+                    "photo_scope_ai",
+                    "photo_scope_billing",
+                ),
+                language,
+            )
+            self._translate_known_values(
+                dossier["risks"],
+                ("photo_risk_server", "photo_risk_ai"),
+                language,
+            )
+            project["title"] = (
+                TEXT[language]["photo_title"].format(customer=customer)
+                if customer
+                else ("Taller fotográfico" if language == "es" else "Photography workshop")
+            )
+            project["summary"] = TEXT[language]["photo_summary"]
+        elif kind == "access_control":
+            self._translate_known_values(dossier["confirmed_scope"], ("scope",), language)
+            self._translate_known_values(dossier["assumptions"], ("assumption",), language)
+            self._translate_known_values(dossier["risks"], ("risk",), language)
+            label = "Control de acceso" if language == "es" else "Access control"
+            project["title"] = f"{customer} · {label}" if customer else label
+            project["summary"] = TEXT[language]["scope"]
+        else:
+            project["title"] = (
+                f"Proyecto de {customer}" if language == "es" and customer else
+                f"{customer} project" if customer else
+                "Nuevo proyecto" if language == "es" else "New project"
+            )
+            project["summary"] = ""
+        work_item = dossier.get("work_item")
+        if work_item:
+            work_item["title"] = project["title"]
+
+    @staticmethod
+    def _translate_known_values(items: list[str], keys: tuple[str, ...], language: str) -> None:
+        for key in keys:
+            variants = {TEXT["es"][key], TEXT["en"][key]}
+            if not any(item in variants for item in items):
+                continue
+            items[:] = [item for item in items if item not in variants]
+            items.append(TEXT[language][key])
+
+    @staticmethod
+    def _extract_photo_facts(project: dict[str, Any], text: str) -> None:
+        facts = project.setdefault("facts", {})
+        patterns = {
+            "archive_volume": r"(?:volumen(?: del archivo)?|archivo actual|archive size)\s*[:\-]\s*([^\n.]{2,160})",
+            "current_server": r"(?:servidor(?: actual)?|almacenamiento(?: actual)?|current server|current storage)\s*[:\-]\s*([^\n.]{2,160})",
+            "delivery_workflow": r"(?:entrega(?: actual)?|flujo de entrega|delivery workflow)\s*[:\-]\s*([^\n.]{2,160})",
+            "billing_workflow": r"(?:cobros?(?: actuales)?|facturaci[oó]n(?: actual)?|billing workflow)\s*[:\-]\s*([^\n.]{2,160})",
+            "local_ai_goal": r"(?:ia local|objetivo de ia|local ai)\s*[:\-]\s*([^\n.]{2,160})",
+            "budget_and_schedule": r"(?:presupuesto y fecha|budget and schedule)\s*[:\-]\s*([^\n.]{2,160})",
+        }
+        for key, pattern in patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                facts[key] = match.group(1).strip()
+
     def _quote_draft(self, dossier: dict[str, Any], language: str) -> EditableQuote:
+        if self._project_kind(dossier) == "photo_workshop":
+            descriptions = (
+                [
+                    "Levantamiento del flujo y arquitectura",
+                    "Organización de colecciones y metadatos",
+                    "Entrega privada desde servidor local",
+                    "Automatización de cobros y seguimiento",
+                    "IA local sujeta a validación de infraestructura",
+                    "Implementación, migración y capacitación",
+                ]
+                if language == "es"
+                else [
+                    "Workflow assessment and architecture",
+                    "Collection and metadata organization",
+                    "Private delivery from the local server",
+                    "Billing and payment-tracking automation",
+                    "Local AI subject to infrastructure validation",
+                    "Implementation, migration, and training",
+                ]
+            )
+            return EditableQuote(
+                status="needs_pricing",
+                lines=[
+                    EditableQuoteLine(line_id="photo_discovery", description=descriptions[0], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id="photo_collections", description=descriptions[1], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id="photo_delivery", description=descriptions[2], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id="photo_billing", description=descriptions[3], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id="photo_ai", description=descriptions[4], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id="photo_implementation", description=descriptions[5], quantity=1, unit_price=0),
+                ],
+            )
         access_points = int(dossier["site"].get("access_points") or 1)
         descriptions = (
             ["Levantamiento técnico y diseño", "Equipos y materiales de control de acceso", "Instalación, configuración y capacitación"]
@@ -1062,11 +1285,27 @@ class ConversationService:
         existing_quote = dossier.get("quote") or {}
         selected = existing_quote.get("selected_option_code", "")
         options = []
-        for code, title_key, summary_key in (
-            ("A", "option_a", "option_a_summary"),
-            ("B", "option_b", "option_b_summary"),
-            ("C", "option_c", "option_c_summary"),
-        ):
+        kind = self._project_kind(dossier)
+        option_keys = (
+            (
+                ("A", "photo_option_a", "photo_option_a_summary"),
+                ("B", "photo_option_b", "photo_option_b_summary"),
+                ("C", "photo_option_c", "photo_option_c_summary"),
+            )
+            if kind == "photo_workshop"
+            else (
+                ("A", "general_option_a", "general_option_a_summary"),
+                ("B", "general_option_b", "general_option_b_summary"),
+                ("C", "general_option_c", "general_option_c_summary"),
+            )
+            if kind == "general"
+            else (
+                ("A", "option_a", "option_a_summary"),
+                ("B", "option_b", "option_b_summary"),
+                ("C", "option_c", "option_c_summary"),
+            )
+        )
+        for code, title_key, summary_key in option_keys:
             alternative = alternatives.get(code)
             if alternative:
                 alt_status = alternative.get("status", "needs_validation")
@@ -1135,12 +1374,31 @@ class ConversationService:
         questions = []
         if not dossier["customer"].get("identifier"):
             questions.append(TEXT[language]["question_customer"])
-        if not dossier["site"].get("location") or not dossier["site"].get("access_points"):
-            questions.append(TEXT[language]["question_site"])
-        if dossier["confirmed_scope"] and not dossier["assumptions"]:
-            questions.append(TEXT[language]["question_existing"])
-        if dossier["confirmed_scope"]:
-            questions.append(TEXT[language]["question_schedule"])
+        kind = self._project_kind(dossier)
+        if kind == "photo_workshop":
+            facts = (dossier.get("project") or {}).get("facts", {})
+            for fact_key, question_key in (
+                ("archive_volume", "photo_question_volume"),
+                ("current_server", "photo_question_server"),
+                ("delivery_workflow", "photo_question_delivery"),
+                ("billing_workflow", "photo_question_billing"),
+                ("local_ai_goal", "photo_question_ai"),
+                ("budget_and_schedule", "photo_question_schedule"),
+            ):
+                if not facts.get(fact_key):
+                    questions.append(TEXT[language][question_key])
+        elif kind == "access_control":
+            if not dossier["site"].get("location") or not dossier["site"].get("access_points"):
+                questions.append(TEXT[language]["question_site"])
+            if dossier["confirmed_scope"] and not dossier["assumptions"]:
+                questions.append(TEXT[language]["question_existing"])
+            if dossier["confirmed_scope"]:
+                questions.append(TEXT[language]["question_schedule"])
+        else:
+            if not dossier["site"].get("location"):
+                questions.append(TEXT[language]["question_general_site"])
+            if not dossier["confirmed_scope"]:
+                questions.append(TEXT[language]["question_general_scope"])
         for question in self._workspace(mission)["open_questions"]:
             if question not in questions:
                 questions.append(question)
@@ -1152,8 +1410,11 @@ class ConversationService:
         score += 12 if dossier["customer"].get("name") else 0
         score += 16 if dossier["customer"].get("identifier") else 0
         score += 22 if dossier["confirmed_scope"] else 0
-        score += 14 if dossier["site"].get("location") else 0
-        score += 12 if dossier["site"].get("access_points") else 0
+        if self._project_kind(dossier) == "photo_workshop":
+            score += min(26, len((dossier.get("project") or {}).get("facts", {})) * 5)
+        else:
+            score += 14 if dossier["site"].get("location") else 0
+            score += 12 if dossier["site"].get("access_points") else 0
         score += 6 if dossier["attachments"] else 0
         score += 3 if dossier.get("extracted_evidence") else 0
         score += 4 if dossier.get("supplier_offers") else 0
@@ -1224,9 +1485,9 @@ class ConversationService:
                 work_item={
                     "task_id": task_id,
                     "correlation_id": mission_id,
-                    "title": "FEMAR access-control quote",
+                    "title": "Nuevo proyecto" if language == "es" else "New project",
                     "status": "in_progress",
-                    "next_action": TEXT[language]["task_next_input"],
+                    "next_action": TEXT[language]["general_task_next_input"],
                     "source_channel": "web",
                 },
             ).model_dump(),
@@ -1318,7 +1579,13 @@ class ConversationService:
             next_action = TEXT[mission["language"]]["task_next_quote"]
         else:
             status = "needs_input"
-            next_action = TEXT[mission["language"]]["task_next_input"]
+            kind = self._project_kind(dossier)
+            next_action_key = {
+                "photo_workshop": "photo_task_next_input",
+                "access_control": "task_next_input",
+                "general": "general_task_next_input",
+            }.get(kind, "general_task_next_input")
+            next_action = TEXT[mission["language"]][next_action_key]
         work_item.update({"status": status, "next_action": next_action})
 
     def _add_event(self, mission: dict[str, Any], kind: str, detail: str) -> None:

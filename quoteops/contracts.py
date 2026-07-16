@@ -302,6 +302,13 @@ class DossierSite(BaseModel):
     operating_constraints: list[str] = Field(default_factory=list)
 
 
+class ProjectProfile(BaseModel):
+    kind: Literal["general", "access_control", "photo_workshop"] = "general"
+    title: str = Field(default="", max_length=200)
+    summary: str = Field(default="", max_length=1000)
+    facts: dict[str, str] = Field(default_factory=dict)
+
+
 class DossierOption(BaseModel):
     code: str
     title: str
@@ -750,6 +757,7 @@ class DecisionWorkspace(BaseModel):
 
 
 class ContextDossier(BaseModel):
+    project: ProjectProfile = Field(default_factory=ProjectProfile)
     customer: DossierCustomer = Field(default_factory=DossierCustomer)
     site: DossierSite = Field(default_factory=DossierSite)
     confirmed_scope: list[str] = Field(default_factory=list)

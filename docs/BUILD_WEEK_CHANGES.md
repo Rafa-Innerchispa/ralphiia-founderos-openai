@@ -64,3 +64,13 @@
 - Added a bilingual responsive decision panel for requirements, questions, assistant selection metadata, sourced products, quantities, roles, compatibility, evidence, rationale, risks, gaps, and human review.
 - Kept runtime truth separate from assistant metadata. Selecting a decision assistant never changes or overstates the QuoteOps runtime label.
 - Locked approved or delivered quotes against later requirement, configuration, package, or price edits. Editing a pre-approval configuration invalidates the stale quote and requires a fresh technical review.
+
+## Multibusiness project profiles
+
+- Replaced the FEMAR-specific default task title with a project profile that starts as general and can deterministically classify access-control or photography-workshop conversations.
+- Added the photography workshop as a separate real case path for collection organization, private client delivery from a local server, optional local AI, and payment tracking.
+- Added photography-specific ES/EN questions for archive volume and growth, existing server/storage/backup/network, delivery permissions and expiration, billing workflow, local-AI goals and hardware, budget, and schedule.
+- Added progressive structured facts for labeled answers while keeping unknown infrastructure, volume, prices, identity, and automation explicitly unresolved.
+- Added photography-specific A/B/C framing and editable quote lines whose selling prices remain zero until a human provides them.
+- Added a generic fallback path so an unrelated project never inherits the FEMAR title, access-point questions, or access-control package descriptions.
+- Preserved FEMAR behavior and added regression coverage for project isolation, ES/EN translation, progressive facts, idempotency, and zero-price quote creation.

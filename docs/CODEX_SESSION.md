@@ -21,6 +21,8 @@ Rafael approved parallel work with explicit ownership. `Hackathon OpenAI · Prin
 
 Staging verification covered health, OpenAPI `0.8.0`, ES/EN mission reads, the decision-panel HTML, mobile breakpoint, typed MCP tool catalog, public progress `54/54`, runtime truth, and preservation of all 39 real supplier lines. The integrated browser client could not initialize because of an internal `process` bootstrap conflict, so no interactive screenshot was captured; HTML, JavaScript syntax, API, and service behavior were verified independently.
 
+On 2026-07-16 Rafael added the photography workshop/lab as a second real QuoteOps case. This session opened an isolated branch from canonical `2b4613f`, created a staging-only mission for Joshua Degel, discovered that the generic task title and questions still inherited FEMAR/access-control language, and corrected that multibusiness boundary with dedicated ES/EN behavior and regression tests. The principal task retained its previously confirmed read-only role over the P0 files while this increment was prepared; Astro remained outside this repository and untouched.
+
 ## Guardrails
 
 - Preserve unrelated untracked files.

@@ -43,11 +43,95 @@ class TestConversationService(unittest.TestCase):
         )
 
         self.assertEqual(result.dossier.customer.name, "FEMAR")
+        self.assertEqual(result.dossier.project.kind, "access_control")
         self.assertEqual(result.dossier.site.location, "Guayaquil")
         self.assertTrue(result.dossier.confirmed_scope)
         self.assertTrue(result.dossier.risks)
         self.assertEqual(result.dossier.attachments[0].name, "levantamiento.pdf")
         self.assertEqual(result.runtime_label, "Codex-built / MCP runtime")
+
+    def test_photo_workshop_uses_its_own_case_questions_options_and_quote(self):
+        initial = self.service.message(
+            ConversationMessageRequest(
+                idempotency_key="photo-workshop-initial-0001",
+                language="es",
+                source_channel="chatgpt_mcp",
+                customer_name="Joshua Degel",
+                message=(
+                    "Crear el expediente del taller fotográfico. Necesita organizar sus colecciones, "
+                    "entregar archivos a clientes desde un servidor local, evaluar IA local y "
+                    "organizar los cobros. No asumir precios ni infraestructura."
+                ),
+            )
+        )
+
+        self.assertEqual(initial.dossier.project.kind, "photo_workshop")
+        self.assertEqual(initial.dossier.project.title, "Taller fotográfico de Joshua Degel")
+        self.assertIn("Organizar colecciones", " ".join(initial.dossier.confirmed_scope))
+        self.assertNotIn("puertas", " ".join(initial.dossier.questions).lower())
+        self.assertEqual(initial.dossier.options[0].title, "Organización esencial")
+        self.assertEqual(initial.dossier.work_item.title, initial.dossier.project.title)
+
+        drafted = self.service.message(
+            ConversationMessageRequest(
+                mission_id=initial.mission_id,
+                idempotency_key="photo-workshop-quote-0001",
+                language="es",
+                message="Preparar cotización editable sin inventar precios.",
+            )
+        )
+
+        line_ids = {line.line_id for line in drafted.dossier.quote.lines}
+        self.assertIn("photo_collections", line_ids)
+        self.assertIn("photo_delivery", line_ids)
+        self.assertIn("photo_billing", line_ids)
+        self.assertTrue(all(line.unit_price == 0 for line in drafted.dossier.quote.lines))
+
+    def test_photo_workshop_language_switch_and_progressive_facts(self):
+        initial = self.service.message(
+            ConversationMessageRequest(
+                idempotency_key="photo-workshop-language-0001",
+                language="es",
+                customer_name="Joshua Degel",
+                message="Laboratorio fotográfico con colecciones, entrega local, IA local y cobros.",
+            )
+        )
+        continued = self.service.message(
+            ConversationMessageRequest(
+                mission_id=initial.mission_id,
+                idempotency_key="photo-workshop-facts-0001",
+                language="es",
+                message=(
+                    "Volumen del archivo: 4 TB. Servidor actual: NAS local. "
+                    "Flujo de entrega: enlace privado por cliente."
+                ),
+            )
+        )
+
+        self.assertEqual(continued.dossier.project.facts["archive_volume"], "4 TB")
+        self.assertEqual(continued.dossier.project.facts["current_server"], "NAS local")
+        self.assertNotIn("Cuánto ocupa", " ".join(continued.dossier.questions))
+
+        english = self.service.get(initial.mission_id, "en")
+        self.assertEqual(english.dossier.project.title, "Joshua Degel photography workshop")
+        self.assertIn("Organize photography", " ".join(english.dossier.confirmed_scope))
+        self.assertIn("payments", " ".join(english.dossier.questions).lower())
+        self.assertNotIn("doors", " ".join(english.dossier.questions).lower())
+
+    def test_general_project_never_inherits_femar_or_access_questions(self):
+        result = self.service.message(
+            ConversationMessageRequest(
+                idempotency_key="general-project-initial-0001",
+                language="es",
+                customer_name="Cliente nuevo",
+                message="Quiero organizar un nuevo proyecto y conversar para definir el alcance.",
+            )
+        )
+
+        self.assertEqual(result.dossier.project.kind, "general")
+        self.assertEqual(result.dossier.project.title, "Proyecto de Cliente nuevo")
+        self.assertNotIn("FEMAR", result.dossier.work_item.title)
+        self.assertNotIn("puertas", " ".join(result.dossier.questions).lower())
 
     def test_message_idempotency_replays_same_mission(self):
         request = ConversationMessageRequest(
