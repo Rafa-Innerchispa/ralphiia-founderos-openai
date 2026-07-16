@@ -57,7 +57,7 @@ def build_fallback_analysis(intake: QuoteIntake, settings: Settings | None = Non
 
     return QuoteIntakeAnalysis(
         analysis_source="fallback",
-        model_used=f"{settings.openai_model}:fallback",
+        model_used="deterministic_rules",
         mission=MissionState(
             mission_id="mission_preview_0001",
             correlation_id="openai-build-week-quoteops-20260714",
@@ -68,7 +68,7 @@ def build_fallback_analysis(intake: QuoteIntake, settings: Settings | None = Non
         technical_risks=TechnicalRisk(items=risks),
         proposal_options=options,
         review=QuoteReview(status="needs_review" if missing else "draft", notes=["Fallback analysis ready"]),
-        next_action="Complete the missing fields and connect GPT-5.6 structured output in H2.",
+        next_action="Complete the missing fields and continue through the QuoteOps review flow.",
     )
 
 

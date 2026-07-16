@@ -17,6 +17,7 @@ class TestIntakeAnalysis(TestCase):
 
         self.assertTrue(analysis.ok)
         self.assertEqual(analysis.analysis_source, "fallback")
+        self.assertEqual(analysis.model_used, "deterministic_rules")
         self.assertEqual(analysis.mission.status, "analysis")
         self.assertGreaterEqual(len(analysis.proposal_options), 1)
         self.assertTrue(analysis.next_action)

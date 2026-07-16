@@ -8,3 +8,18 @@
 - New identity workflow: compare verified taxpayer data with RalphiIA parties/clients and Contífico, expose conflicts, prefill a draft, and require approval.
 - New isolated persistence: staging party/client/identity-map collections with unique RUC indexes and idempotent confirmation.
 - New frontend module: live RUC lookup, evidence signals, reconciliation status, conflict count, and approval action.
+
+## Conversation-first P0
+
+- Replaced the technical cockpit with a central, responsive chat for project and quote creation.
+- Added a persistent ES/EN selector and a translation catalog that covers UI text, workflow states, validation guidance, and backend mission messages.
+- Added an idempotent conversation mission API with persisted progressive state in the isolated QuoteOps MongoDB database and in-memory continuity when MongoDB is unavailable.
+- Added the FEMAR access-control case path: long-form project text, real attachment upload, sanitized filenames, 25 MB limit, SHA-256 evidence, missing-information questions, risks, assumptions, options, and progress.
+- Added a single Ecuadorian identity boundary for 10-digit cédula and 13-digit RUC. Cédula uses local checksum validation and read-only internal reconciliation; only an authorized RUC calls Intuito.
+- Reused the existing RalphiIA and Contífico identity readers without production writes or duplicate creation.
+- Added an integration trace projection for MCP, Intuito, Contífico, Smart Quoter, MongoDB, and PDF with real source, observed call, status, latency, UTC time, and sanitized result.
+- Added editable quote lines with zero initial prices, preventing invented commercial values.
+- Added idempotent price update, human approval, real PDF artifact generation, and isolated delivery registration.
+- Changed deterministic intake metadata from a model-like fallback label to `deterministic_rules`.
+- Added unit and API integration coverage for conversation, language, attachments, identity validation, idempotency, quote transition, approval, PDF, and delivery.
+- Preserved all unrelated untracked parser, reconciliation, cash-flow, and watchdog files.

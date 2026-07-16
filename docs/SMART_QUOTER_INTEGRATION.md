@@ -1,6 +1,6 @@
 # Smart Quoter Integration
 
-QuoteOps reuses the existing InnerSpark Smart Quoter service at `127.0.0.1:2026` through a read-only adapter.
+QuoteOps reuses selected capabilities from the existing InnerSpark Smart Quoter service at `127.0.0.1:2026` through a read-only adapter. The repository and service were audited without edits on 2026-07-15.
 
 ## Reused operations
 
@@ -14,9 +14,13 @@ The adapter lives at `quoteops/adapters/smart_quoter.py`. QuoteOps exposes these
 
 The frontend labels the source as Smart Quoter 2026 and marks writes as blocked.
 
+The conversation-first UI does not copy the legacy dashboard. It reuses only the useful concepts of progressive diagnosis, operator refinement, client context, editable quoting, PDF, and delivery gates. QuoteOps owns the new mission state, bilingual experience, idempotency, trace model, and approval boundary.
+
 ## Validation
 
 - Smart Quoter process verified on port `2026`.
-- Read-only client lookup verified with RUC `0992364866001` and HTTP 200.
+- OpenAPI title observed: `InnerSpark Smart Quoter API`, version `0.1.0`.
+- Read-only audit observed the available quote, audio, diagnostic, refinement, developer-helper, delivery, and transcription routes. No create, save, upload, delivery, or developer-helper route was called during the audit.
+- Read-only client lookup verified with an authorized, masked RUC `099******6001` and HTTP 200.
 - QuoteOps adapter and frontend compile successfully.
 - QuoteOps targeted tests pass.

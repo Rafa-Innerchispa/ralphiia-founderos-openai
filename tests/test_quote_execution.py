@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from quoteops.adapters.quote_execution import QuoteExecutionService
@@ -24,6 +25,22 @@ class TestQuoteExecution(unittest.TestCase):
         self.assertEqual(delivery["status"], "simulated")
         owner = self.service.deliver({"approval_id": approved["approval_id"], "channels": ["whatsapp"], "mode": "owner"})
         self.assertEqual(owner["status"], "blocked")
+
+    def test_registered_delivery_remains_json_safe_when_mongo_mutates_insert(self):
+        approved = self.service.approve({"intake": {"customer_name": "FEMAR", "contact": "1710034065", "original_text": "Control de acceso"}, "approved_by": "Rafael", "mode": "judge"})
+
+        class MutatingCollection:
+            def insert_one(self, value):
+                value["_id"] = object()
+
+        class FakeDb:
+            quoteops_deliveries = MutatingCollection()
+
+        self.service.db = FakeDb()
+        delivery = self.service.deliver({"approval_id": approved["approval_id"], "channels": ["download"], "mode": "judge"})
+
+        self.assertEqual(delivery["status"], "registered")
+        json.dumps(delivery)
 
 
 if __name__ == "__main__":

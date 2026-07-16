@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from time import perf_counter
 from typing import Any
 
 import httpx
@@ -29,8 +31,20 @@ DEFAULT_TARGETS: tuple[BridgeTarget, ...] = (
 
 
 async def check_target(client: httpx.AsyncClient, target: BridgeTarget) -> dict[str, Any]:
-    response = await client.get(target.url, timeout=5.0, headers=target.headers)
-    body_preview = response.text[:200] if response.text else ""
+    started = perf_counter()
+    try:
+        response = await client.get(target.url, timeout=5.0, headers=target.headers)
+    except httpx.HTTPError as exc:
+        return {
+            "name": target.name,
+            "url": target.url,
+            "status_code": 0,
+            "ok": False,
+            "protocol_hint": "unavailable",
+            "latency_ms": round((perf_counter() - started) * 1000, 1),
+            "observed_at": datetime.now(timezone.utc).isoformat(),
+            "result": type(exc).__name__,
+        }
     live = response.status_code in target.acceptable_statuses
     protocol_hint = "streamable-http handshake required" if target.name == "raphiia-mcp" and response.status_code != 200 else "ok"
     return {
@@ -39,7 +53,9 @@ async def check_target(client: httpx.AsyncClient, target: BridgeTarget) -> dict[
         "status_code": response.status_code,
         "ok": live,
         "protocol_hint": protocol_hint,
-        "body_preview": body_preview,
+        "latency_ms": round((perf_counter() - started) * 1000, 1),
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "result": f"HTTP {response.status_code}; {protocol_hint}",
     }
 
 

@@ -84,7 +84,7 @@ class QuoteAnalysisResult(BaseModel):
 class QuoteIntakeAnalysis(BaseModel):
     ok: bool = True
     analysis_source: Literal["openai", "fallback"] = "fallback"
-    model_used: str = "gpt-5.6"
+    model_used: str = "deterministic"
     mission: MissionState
     intake: QuoteIntake
     missing_information: MissingInformation = Field(default_factory=MissingInformation)
@@ -237,3 +237,152 @@ class RucConfirmationResult(BaseModel):
     duplicate_count: int = 1
     canonical_status: Literal["staging_only", "upserted", "blocked", "error"] = "staging_only"
     canonical_client_id: str = ""
+
+
+LanguageCode = Literal["es", "en"]
+
+
+class ConversationAttachment(BaseModel):
+    name: str = Field(min_length=1, max_length=240)
+    media_type: str = Field(default="application/octet-stream", max_length=120)
+    size_bytes: int = Field(default=0, ge=0, le=25_000_000)
+    storage_id: str = Field(default="", max_length=120)
+    sha256: str = Field(default="", max_length=64)
+    status: Literal["selected", "stored"] = "selected"
+
+    @field_validator("name", "media_type", mode="before")
+    @classmethod
+    def strip_attachment_text(cls, value):
+        return str(value or "").strip()
+
+
+class ConversationMessageRequest(BaseModel):
+    mission_id: str = Field(default="", max_length=80, pattern=r"^(?:|mission_[a-f0-9]{18})$")
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    message: str = Field(default="", max_length=30_000)
+    attachments: list[ConversationAttachment] = Field(default_factory=list, max_length=20)
+
+    @field_validator("mission_id", "idempotency_key", "message", mode="before")
+    @classmethod
+    def strip_conversation_text(cls, value):
+        return str(value or "").strip()
+
+
+class DossierCustomer(BaseModel):
+    name: str = ""
+    identifier: str = ""
+    identifier_type: Literal["cedula", "ruc", ""] = ""
+    verification_status: Literal["pending", "locally_valid", "verified", "needs_review"] = "pending"
+    source: str = ""
+
+
+class DossierSite(BaseModel):
+    location: str = ""
+    access_points: str = ""
+    operating_constraints: list[str] = Field(default_factory=list)
+
+
+class DossierOption(BaseModel):
+    code: str
+    title: str
+    summary: str
+
+
+class EditableQuoteLine(BaseModel):
+    line_id: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=400)
+    quantity: float = Field(default=1, gt=0, le=100_000)
+    unit_price: float = Field(default=0, ge=0, le=100_000_000)
+
+
+class EditableQuote(BaseModel):
+    currency: Literal["USD"] = "USD"
+    status: Literal["needs_pricing", "draft", "approved", "delivered"] = "needs_pricing"
+    lines: list[EditableQuoteLine] = Field(default_factory=list, max_length=100)
+    subtotal: float = Field(default=0, ge=0)
+    tax: float = Field(default=0, ge=0)
+    total: float = Field(default=0, ge=0)
+    approval_id: str = ""
+    artifact_id: str = ""
+    pdf_url: str = ""
+    delivery_id: str = ""
+
+
+class ContextDossier(BaseModel):
+    customer: DossierCustomer = Field(default_factory=DossierCustomer)
+    site: DossierSite = Field(default_factory=DossierSite)
+    confirmed_scope: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    options: list[DossierOption] = Field(default_factory=list)
+    attachments: list[ConversationAttachment] = Field(default_factory=list)
+    progress: int = Field(default=0, ge=0, le=100)
+    quote: EditableQuote | None = None
+
+
+class ConversationTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(max_length=30_000)
+    at: str
+
+
+class ConversationReply(BaseModel):
+    ok: bool = True
+    mission_id: str
+    language: LanguageCode
+    phase: Literal["discovery", "identity", "scope", "quote", "approval", "delivery"]
+    assistant_message: str
+    dossier: ContextDossier
+    history: list[ConversationTurn] = Field(default_factory=list)
+    idempotent_replay: bool = False
+    runtime_label: str = "Codex-built / MCP runtime"
+
+
+class QuoteUpdateRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    lines: list[EditableQuoteLine] = Field(min_length=1, max_length=100)
+    tax_rate: float = Field(default=0, ge=0, le=1)
+
+
+class MissionApprovalRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    approved_by: str = Field(min_length=2, max_length=120)
+    access_mode: Literal["private", "judge"] = "judge"
+
+
+class MissionDeliveryRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    channels: list[Literal["download", "email", "whatsapp", "telegram"]] = Field(
+        default_factory=lambda: ["download"], max_length=4
+    )
+    access_mode: Literal["private", "judge"] = "judge"
+
+
+class CustomerIdentifierLookupRequest(BaseModel):
+    identifier: str = Field(min_length=10, max_length=13)
+    mission_id: str = Field(default="", max_length=80, pattern=r"^(?:|mission_[a-f0-9]{18})$")
+    language: LanguageCode = "es"
+    force_refresh: bool = False
+
+    @field_validator("identifier", mode="before")
+    @classmethod
+    def validate_identifier_digits(cls, value: str) -> str:
+        clean = re.sub(r"[\s-]", "", str(value or ""))
+        if not re.fullmatch(r"(?:[0-9]{10}|[0-9]{13})", clean):
+            raise ValueError("identifier must contain 10 or 13 digits")
+        return clean
+
+
+class IntegrationTrace(BaseModel):
+    integration: str
+    source: str
+    call: str
+    status: Literal["ready", "ok", "warning", "error", "not_configured"]
+    latency_ms: float = Field(default=0, ge=0)
+    observed_at: str
+    result: str

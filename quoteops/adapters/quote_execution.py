@@ -70,9 +70,16 @@ class QuoteExecutionService:
         if mode == "owner" and not self.settings.allow_production_writes:
             return {"ok": True, "status": "blocked", "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event("delivery_blocked", "Produccion deshabilitada en staging")]}
         delivery_id = "delivery_" + uuid4().hex[:18]
-        delivery = {"delivery_id": delivery_id, "approval_id": approval_id, "status": "simulated" if mode == "sandbox" else "queued", "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event("delivery_simulated" if mode == "sandbox" else "delivery_queued", "Entrega registrada sin envio arbitrario")]}
+        status = "simulated" if mode == "sandbox" else ("queued" if mode == "owner" else "registered")
+        event_kind = {
+            "simulated": "delivery_simulated",
+            "queued": "delivery_queued",
+            "registered": "delivery_registered",
+        }[status]
+        delivery = {"delivery_id": delivery_id, "approval_id": approval_id, "status": status, "channels": channels, "mode": mode, "timeline": record["timeline"] + [self._event(event_kind, "Entrega registrada sin envio arbitrario")]}
         if self.db is not None:
-            self.db.quoteops_deliveries.insert_one(delivery)
+            # PyMongo adds an ObjectId to inserted dictionaries; persist a copy so API output remains JSON-safe.
+            self.db.quoteops_deliveries.insert_one(dict(delivery))
         return {"ok": True, **delivery}
 
     def artifact_path(self, artifact_id: str):
@@ -85,7 +92,11 @@ class QuoteExecutionService:
 
     @staticmethod
     def _pdf(customer: str, text: str) -> bytes:
-        content = f"BT /F1 12 Tf 50 760 Td (RalphiIA QuoteOps) Tj T* (Cliente: {customer[:100]}) Tj T* (Propuesta: {text[:400]}) Tj ET"
+        def pdf_text(value: str, limit: int) -> str:
+            clean = str(value or "").encode("ascii", "replace").decode("ascii")[:limit]
+            return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)").replace("\n", " ")
+
+        content = f"BT /F1 12 Tf 50 760 Td 16 TL (RalphiIA QuoteOps) Tj T* (Customer: {pdf_text(customer, 100)}) Tj T* (Quote: {pdf_text(text, 400)}) Tj ET"
         objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>", b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", f"<< /Length {len(content)} >>\nstream\n{content}\nendstream".encode()]
         out = bytearray(b"%PDF-1.4\n")
         offsets = [0]

@@ -1,607 +1,375 @@
 from __future__ import annotations
 
-import html
 import json
 from typing import Any
 
 
 def build_cockpit_bootstrap(payload: dict[str, Any]) -> dict[str, Any]:
-    reuse = payload.get("reuse", {})
-    results = payload.get("reuse_verify", {}).get("results", [])
     return {
         "project": payload.get("meta", {}).get("project", "ralphiia-quoteops"),
-        "task_id": payload.get("meta", {}).get("task_id", "ops_202172a3b4c8"),
-        "correlation_id": payload.get("meta", {}).get("correlation_id", "openai-build-week-quoteops-20260714"),
-        "reuse_count": reuse.get("reuse_count", 0),
-        "new_count": reuse.get("new_count", 0),
-        "stack_ok": payload.get("reuse_verify", {}).get("ok", False),
-        "stack_results": results,
+        "runtime_label": payload.get("runtime_label", "Codex-built / MCP runtime"),
+        "integration_traces": payload.get("integration_traces", []),
     }
 
 
 def render_cockpit_page(payload: dict[str, Any]) -> str:
     bootstrap = build_cockpit_bootstrap(payload)
     bootstrap_json = json.dumps(bootstrap, ensure_ascii=False).replace("</", "<\\/")
-    meta_json = html.escape(json.dumps(payload.get("meta", {}), ensure_ascii=False))
-    template = """<!doctype html>
+    template = r"""<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QuoteOps Cockpit</title>
+  <meta name="color-scheme" content="light" />
+  <title>QuoteOps · Proyectos y cotizaciones</title>
   <style>
     :root {
-      --bg: #07111f;
-      --panel: rgba(10, 20, 35, 0.78);
-      --line: rgba(151, 171, 198, 0.18);
-      --text: #edf4ff;
-      --muted: #98abc4;
-      --accent: #f7b955;
-      --accent-2: #6ee7b7;
-      --danger: #ff8a6b;
-      --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
-      --radius: 24px;
+      --ink: #172320;
+      --muted: #64716c;
+      --paper: #f5f1e7;
+      --paper-deep: #e8e1d2;
+      --card: rgba(255, 253, 247, .92);
+      --line: rgba(23, 35, 32, .14);
+      --orange: #ed6a3a;
+      --orange-deep: #b63f20;
+      --teal: #157267;
+      --teal-soft: #d8ece7;
+      --gold: #f2c14e;
+      --danger: #a73f34;
+      --shadow: 0 22px 55px rgba(56, 48, 34, .12);
+      --radius: 22px;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background:
-      radial-gradient(circle at top left, rgba(247, 185, 85, 0.18), transparent 24%),
-      radial-gradient(circle at top right, rgba(110, 231, 183, 0.14), transparent 28%),
-      linear-gradient(180deg, #091321 0%, #050b14 100%); color: var(--text); min-height: 100vh; }
-    .wrap { max-width: 1440px; margin: 0 auto; padding: 28px; }
-    .hero { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 18px; margin-bottom: 18px; }
-    .brand, .panel, .stat { border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-    .brand { padding: 30px; background: linear-gradient(135deg, rgba(16, 34, 56, 0.92), rgba(8, 15, 26, 0.94)); position: relative; overflow: hidden; }
-    .brand::after { content: ''; position: absolute; inset: auto -120px -140px auto; width: 320px; height: 320px; background: radial-gradient(circle, rgba(247, 185, 85, 0.25), transparent 60%); pointer-events: none; }
-    .eyebrow { display: inline-flex; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid rgba(247, 185, 85, 0.35); border-radius: 999px; color: var(--accent); background: rgba(247, 185, 85, 0.08); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 16px 0 10px; font-size: clamp(32px, 5vw, 58px); line-height: 0.95; letter-spacing: -0.04em; }
-    .lede { max-width: 72ch; color: var(--muted); font-size: 16px; line-height: 1.6; margin: 0; }
-    .stats { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stat { padding: 18px; background: rgba(7, 17, 31, 0.65); }
-    .stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; }
-    .stat-value { font-size: 30px; font-weight: 700; margin-top: 10px; }
-    .grid { display: grid; grid-template-columns: 1.15fr 0.95fr 0.9fr; gap: 18px; align-items: start; }
-    .panel { background: var(--panel); backdrop-filter: blur(16px); padding: 22px; }
-    .panel h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.02em; }
-    .panel p.sub { margin: 0 0 16px; color: var(--muted); line-height: 1.6; }
-    .field { display: grid; gap: 8px; margin-bottom: 12px; }
-    .field label { color: #d8e5f7; font-size: 13px; }
-    input, select, textarea { width: 100%; border: 1px solid rgba(151, 171, 198, 0.24); border-radius: 16px; padding: 14px; background: rgba(3, 8, 16, 0.72); color: var(--text); outline: none; font: inherit; }
-    textarea { min-height: 132px; resize: vertical; }
-    input:focus, select:focus, textarea:focus { border-color: rgba(247, 185, 85, 0.65); box-shadow: 0 0 0 3px rgba(247, 185, 85, 0.12); }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
-    button { border: 0; border-radius: 999px; padding: 13px 18px; font-weight: 700; cursor: pointer; transition: transform .15s ease, opacity .15s ease; }
-    button:hover { transform: translateY(-1px); }
-    .primary { background: linear-gradient(135deg, var(--accent), #ffcf76); color: #1c1205; }
-    .secondary { background: rgba(110, 231, 183, 0.14); color: var(--accent-2); border: 1px solid rgba(110, 231, 183, 0.28); }
-    .ghost { background: transparent; color: var(--text); border: 1px solid rgba(151, 171, 198, 0.22); }
-    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip { padding: 7px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #e7eef9; font-size: 12px; border: 1px solid rgba(255,255,255,0.08); }
-    .list { display: grid; gap: 12px; }
-    .card { padding: 16px; border-radius: 18px; background: rgba(3, 8, 16, 0.52); border: 1px solid rgba(151, 171, 198, 0.16); }
-    .card h3 { margin: 0 0 6px; font-size: 16px; }
-    .small { color: var(--muted); font-size: 13px; line-height: 1.5; }
-    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.5; }
-    .timeline { display: grid; gap: 10px; }
-    .step { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 14px; border-radius: 16px; background: rgba(3, 8, 16, 0.54); border: 1px solid rgba(151, 171, 198, 0.14); }
-    .step.active { border-color: rgba(247, 185, 85, 0.42); background: rgba(247, 185, 85, 0.08); }
-    .step.done { border-color: rgba(110, 231, 183, 0.32); }
-    .badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
-    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 4px rgba(255, 138, 107, 0.12); }
-    .status-dot.ok { background: var(--accent-2); box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.12); }
-    .status-dot.wait { background: var(--accent); box-shadow: 0 0 0 4px rgba(247, 185, 85, 0.12); }
-    .foot { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-    .jsonbox { max-height: 280px; overflow: auto; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
-    .ruc-grid { display: grid; grid-template-columns: .75fr 1.25fr; gap: 18px; margin-top: 18px; }
-    .signal { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 16px; background: rgba(3, 8, 16, .5); }
-    .signal strong { font-size: 15px; }
-    .signal span { color: var(--muted); font-size: 12px; }
-    .verified { color: var(--accent-2); }
-    .money { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 750; }
-    .operational-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
-    .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
-    .metric { padding: 13px; border-radius: 16px; background: rgba(3, 8, 16, .52); border: 1px solid var(--line); }
-    .metric strong { display: block; font-size: 21px; margin-top: 5px; }
-    .accent-line { width: 66px; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); margin: 18px 0; }
-    @media (max-width: 1180px) { .hero, .grid, .grid2, .ruc-grid, .operational-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 680px) { .metric-strip, .row { grid-template-columns: 1fr 1fr; } .wrap { padding: 14px; } }
+    html { background: var(--paper); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(23,35,32,.028) 1px, transparent 1px) 0 0 / 34px 34px,
+        linear-gradient(rgba(23,35,32,.028) 1px, transparent 1px) 0 0 / 34px 34px,
+        radial-gradient(circle at 12% 6%, rgba(242,193,78,.28), transparent 30%),
+        radial-gradient(circle at 94% 12%, rgba(21,114,103,.18), transparent 34%),
+        var(--paper);
+    }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { max-width: 1540px; margin: 0 auto; padding: 20px; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      min-height: 70px; padding: 12px 18px; margin-bottom: 16px;
+      border: 1px solid var(--line); border-radius: 20px; background: rgba(255,253,247,.78);
+      backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgba(56,48,34,.08);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mark { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; color: white; font-weight: 900; background: linear-gradient(145deg, var(--orange), var(--orange-deep)); box-shadow: 0 9px 24px rgba(182,63,32,.24); }
+    .brand h1 { margin: 0; font: 700 23px/1 "Palatino Linotype", Georgia, serif; letter-spacing: -.02em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+    .runtime { max-width: 240px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: white; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lang { display: inline-flex; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: white; }
+    .lang button { border: 0; background: transparent; color: var(--muted); padding: 7px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; }
+    .lang button.active { background: var(--ink); color: white; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(360px, .92fr); gap: 16px; height: calc(100vh - 126px); min-height: 680px; }
+    .chat-shell, .side-shell { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+    .chat-shell { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; }
+    .chat-head { padding: 21px 24px 17px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+    .chat-head h2 { margin: 0; font: 700 clamp(25px,3vw,38px)/1.04 "Palatino Linotype", Georgia, serif; letter-spacing: -.035em; }
+    .chat-head p { margin: 8px 0 0; max-width: 680px; color: var(--muted); line-height: 1.45; font-size: 14px; }
+    .phase { flex: none; display: grid; gap: 5px; justify-items: end; }
+    .phase span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+    .phase strong { font-size: 13px; color: var(--teal); }
+    .messages { overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
+    .message { max-width: min(82%, 760px); padding: 14px 16px; border-radius: 19px; line-height: 1.5; font-size: 14px; white-space: pre-wrap; animation: rise .24s ease both; }
+    .message.assistant { align-self: flex-start; background: white; border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+    .message.user { align-self: flex-end; color: white; background: linear-gradient(140deg, var(--teal), #0d5149); border-bottom-right-radius: 6px; }
+    .message small { display: block; opacity: .67; margin-bottom: 5px; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .starter { align-self: flex-start; max-width: 700px; padding: 16px; border: 1px dashed rgba(237,106,58,.5); border-radius: 18px; background: rgba(237,106,58,.055); }
+    .starter strong { display: block; margin-bottom: 7px; font-family: "Palatino Linotype", Georgia, serif; font-size: 18px; }
+    .starter p { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .composer { padding: 14px 18px 18px; border-top: 1px solid var(--line); background: rgba(255,253,247,.96); }
+    .selected-files { display: flex; gap: 7px; flex-wrap: wrap; min-height: 0; margin-bottom: 8px; }
+    .file-chip { padding: 6px 9px; border-radius: 999px; background: var(--teal-soft); color: #0d5149; font-size: 11px; }
+    .compose-row { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 10px; }
+    textarea { width: 100%; min-height: 54px; max-height: 190px; resize: vertical; padding: 15px 16px; border: 1px solid var(--line); border-radius: 17px; background: white; color: var(--ink); outline: 0; line-height: 1.45; }
+    textarea:focus, input:focus { border-color: rgba(21,114,103,.62); box-shadow: 0 0 0 3px rgba(21,114,103,.1); }
+    .icon-btn, .send, .action { border: 0; border-radius: 15px; font-weight: 900; }
+    .icon-btn { width: 52px; height: 52px; color: var(--teal); background: var(--teal-soft); font-size: 20px; }
+    .send { min-width: 92px; height: 52px; padding: 0 18px; color: white; background: var(--orange); box-shadow: 0 8px 20px rgba(237,106,58,.25); }
+    .send:disabled, .action:disabled { cursor: not-allowed; opacity: .45; }
+    .compose-note { margin: 8px 4px 0; color: var(--muted); font-size: 10px; display: flex; justify-content: space-between; gap: 12px; }
+    .side-shell { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 7px; border-bottom: 1px solid var(--line); background: var(--paper-deep); }
+    .tabs button { border: 0; border-radius: 13px; padding: 11px; color: var(--muted); background: transparent; font-weight: 900; }
+    .tabs button.active { color: var(--ink); background: white; box-shadow: 0 4px 15px rgba(56,48,34,.09); }
+    .side-content { overflow-y: auto; padding: 17px; }
+    .tab-panel[hidden] { display: none; }
+    .progress-block { margin-bottom: 14px; padding: 16px; color: white; border-radius: 18px; background: linear-gradient(145deg, var(--ink), #30443e); }
+    .progress-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .progress-row strong { font: 700 20px/1 "Palatino Linotype", Georgia, serif; }
+    .progress-row span { font-size: 12px; }
+    .bar { height: 7px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.16); }
+    .bar i { display: block; height: 100%; width: 10%; border-radius: inherit; background: linear-gradient(90deg, var(--gold), var(--orange)); transition: width .35s ease; }
+    .identity { margin-bottom: 13px; padding: 15px; border: 1px solid rgba(21,114,103,.24); border-radius: 18px; background: rgba(216,236,231,.42); }
+    .identity h3, .section h3 { margin: 0 0 8px; font: 700 17px/1.2 "Palatino Linotype", Georgia, serif; }
+    .identity p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .identity-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    input { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; background: white; color: var(--ink); outline: 0; }
+    .action { padding: 11px 13px; color: white; background: var(--teal); }
+    .status-text { min-height: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .section { margin-bottom: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 17px; background: white; }
+    .section ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .empty { color: var(--muted); font-size: 12px; font-style: italic; }
+    .option { padding: 10px; border-radius: 12px; background: var(--paper); margin-top: 7px; }
+    .option strong { display: block; font-size: 12px; }
+    .option span { color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .quote-line { display: grid; grid-template-columns: 1fr 66px 100px; gap: 6px; margin: 7px 0; }
+    .quote-line input { padding: 8px; font-size: 11px; }
+    .quote-totals { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 900; }
+    .quote-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+    .quote-actions .action { font-size: 11px; }
+    .quote-actions .secondary { color: var(--teal); background: var(--teal-soft); }
+    .pdf-link { color: var(--orange-deep); font-size: 12px; font-weight: 900; }
+    .trace-card { position: relative; padding: 14px 14px 14px 17px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+    .trace-card::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 0 5px 5px 0; background: var(--gold); }
+    .trace-card.ok::before, .trace-card.ready::before { background: var(--teal); }
+    .trace-card.error::before { background: var(--danger); }
+    .trace-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .trace-head strong { font-size: 13px; }
+    .trace-head span { font-size: 10px; text-transform: uppercase; font-weight: 900; color: var(--teal); }
+    .trace-card dl { display: grid; grid-template-columns: 58px 1fr; gap: 4px 8px; margin: 9px 0 0; font-size: 10px; line-height: 1.35; }
+    .trace-card dt { color: var(--muted); }
+    .trace-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .trace-note { padding: 12px; margin-bottom: 12px; color: var(--muted); background: var(--paper); border-radius: 14px; font-size: 11px; line-height: 1.45; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 5; max-width: 360px; padding: 13px 16px; color: white; background: var(--ink); border-radius: 14px; box-shadow: var(--shadow); transform: translateY(18px); opacity: 0; pointer-events: none; transition: .22s ease; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    @keyframes rise { from { opacity: 0; transform: translateY(7px); } }
+    @media (max-width: 980px) {
+      .app { padding: 10px; }
+      .workspace { grid-template-columns: 1fr; height: auto; min-height: 0; }
+      .chat-shell { min-height: calc(100vh - 104px); }
+      .messages { min-height: 48vh; max-height: 58vh; }
+      .side-shell { min-height: 620px; }
+      .runtime { display: none; }
+    }
+    @media (max-width: 580px) {
+      .topbar { min-height: 58px; padding: 9px 11px; }
+      .mark { width: 36px; height: 36px; }
+      .brand h1 { font-size: 19px; }
+      .brand p { display: none; }
+      .chat-head { padding: 17px; }
+      .chat-head h2 { font-size: 27px; }
+      .phase { display: none; }
+      .messages { padding: 16px; }
+      .message { max-width: 92%; }
+      .composer { padding: 11px; }
+      .compose-row { grid-template-columns: auto 1fr; }
+      .send { grid-column: 1 / -1; width: 100%; }
+      .compose-note span:last-child { display: none; }
+      .quote-line { grid-template-columns: 1fr 58px 85px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
+  <div class="app">
+    <header class="topbar">
       <div class="brand">
-        <span class="eyebrow">QuoteOps Cockpit</span>
-        <h1>Del mensaje bruto a la cotización verificable.</h1>
-        <div class="accent-line"></div>
-        <p class="lede">Una experiencia operativa creada para mostrar reutilización real del stack RalphiIA, análisis estructurado con GPT-5.6 cuando esté habilitado, y trazabilidad de todo el flujo desde intake hasta delivery.</p>
-        <div class="chips" style="margin-top:18px;">
-          <span class="chip">repo nuevo</span>
-          <span class="chip">structured outputs</span>
-          <span class="chip">reuse-first</span>
-          <span class="chip">sandbox safe</span>
-          <span class="chip">verificable</span>
+        <div class="mark">Q</div>
+        <div><h1>QuoteOps</h1><p data-i18n="brandSub">Proyectos que avanzan conversando</p></div>
+      </div>
+      <div class="top-actions">
+        <div class="runtime" id="runtimeLabel"></div>
+        <div class="lang" aria-label="Language selector">
+          <button id="langEs" data-lang="es">ES</button><button id="langEn" data-lang="en">EN</button>
         </div>
       </div>
-      <div class="stats">
-        <div class="stat"><div class="stat-label">Reuse count</div><div class="stat-value" id="reuseCount">__REUSE_COUNT__</div></div>
-        <div class="stat"><div class="stat-label">New components</div><div class="stat-value" id="newCount">__NEW_COUNT__</div></div>
-        <div class="stat"><div class="stat-label">Stack status</div><div class="stat-value" id="stackStatus">__STACK_STATUS__</div></div>
-        <div class="stat"><div class="stat-label">Task ID</div><div class="stat-value" style="font-size:18px;">__TASK_ID__</div></div>
-      </div>
-    </section>
+    </header>
 
-    <section class="grid">
-      <div class="panel">
-        <h2>Intake Composer</h2>
-        <p class="sub">Captura un request, valida lo mínimo y manda el análisis al motor estructurado.</p>
-        <div class="row">
-          <div class="field"><label for="source_channel">Source channel</label><select id="source_channel"><option value="sandbox">sandbox</option><option value="whatsapp">whatsapp</option><option value="web">web</option></select></div>
-          <div class="field"><label for="customer_name">Customer name</label><input id="customer_name" value="Ana" placeholder="Cliente" /></div>
+    <main class="workspace">
+      <section class="chat-shell">
+        <div class="chat-head">
+          <div><h2 data-i18n="headline">Cuéntame qué necesitas construir.</h2><p data-i18n="subhead">Convirtamos una conversación, documentos y datos verificados en una cotización lista para aprobar.</p></div>
+          <div class="phase"><span data-i18n="currentStage">Etapa actual</span><strong id="phaseLabel">Descubrimiento</strong></div>
         </div>
-        <div class="row">
-          <div class="field"><label for="contact">Contact</label><input id="contact" value="ana@example.com" placeholder="Email o teléfono" maxlength="200" pattern="(?:\+?[0-9][0-9 .()\-]{6,19}|[^@\s]+@[^@\s]+\.[^@\s]+)" /></div>
-          <div class="field"><label for="attachments">Attachments</label><input id="attachments" value="brief.pdf,chat.png" placeholder="archivos separados por coma" /></div>
+        <div class="messages" id="messages" aria-live="polite">
+          <div class="message assistant"><small>QuoteOps</small><span data-i18n="welcome">Describe el proyecto con todo el detalle que tengas. Iré organizando el expediente y te preguntaré únicamente lo que falte.</span></div>
+          <div class="starter" id="starter">
+            <strong data-i18n="femarTitle">Empezar con el proyecto FEMAR</strong>
+            <p data-i18n="femarDesc">Carga el caso de cambio o rehabilitación del control de acceso y continúa completándolo en conversación.</p>
+            <button class="action" id="femarBtn" data-i18n="loadCase">Cargar caso</button>
+          </div>
         </div>
-        <div class="field"><label for="original_text">Original text</label><textarea id="original_text">Necesito una cotización para automatizar WhatsApp, PDFs y seguimiento de entrega.</textarea></div>
-        <div class="btn-row">
-          <button class="primary" id="analyzeBtn">Analyze intake</button>
-          <button class="secondary" id="previewBtn">Preview fallback</button>
-          <button class="ghost" id="verifyBtn">Verify stack</button>
+        <div class="composer">
+          <div class="selected-files" id="selectedFiles"></div>
+          <div class="compose-row">
+            <input id="fileInput" type="file" multiple hidden />
+            <button class="icon-btn" id="attachBtn" aria-label="Attach files" title="Attach files">+</button>
+            <textarea id="messageInput" maxlength="30000" data-i18n-placeholder="messagePlaceholder" placeholder="Escribe aquí el proyecto, responde preguntas o pide preparar la cotización..."></textarea>
+            <button class="send" id="sendBtn" data-i18n="send">Enviar</button>
+          </div>
+          <div class="compose-note"><span id="composerHint" data-i18n="attachmentHint">Hasta 30.000 caracteres · 20 archivos · 25 MB por archivo</span><span data-i18n="enterHint">Ctrl/⌘ + Enter para enviar</span></div>
         </div>
-        <div class="foot"><span id="analysisHint">Ready for structured analysis.</span><span>H2 live</span></div>
-      </div>
+      </section>
 
-      <div class="panel">
-        <h2>Analysis Output</h2>
-        <p class="sub">Structured data returned by the backend, shown as the judge will see it.</p>
-        <div class="chips" id="analysisChips"></div>
-        <div class="card" style="margin-top:14px;">
-          <h3>Result</h3>
-          <div class="jsonbox"><pre id="analysisJson">Waiting for analysis...</pre></div>
+      <aside class="side-shell">
+        <div class="tabs"><button class="active" data-tab="dossier" data-i18n="caseFile">Expediente</button><button data-tab="traces" data-i18n="connections">Conexiones</button></div>
+        <div class="side-content">
+          <div class="tab-panel" id="dossierPanel">
+            <div class="progress-block"><div class="progress-row"><strong data-i18n="projectProgress">Progreso del proyecto</strong><span id="progressValue">10%</span></div><div class="bar"><i id="progressBar"></i></div></div>
+            <div class="identity">
+              <h3 data-i18n="verifyCustomer">Validar cliente</h3>
+              <p data-i18n="identityHelp">Cédula de 10 dígitos o RUC de 13. Intuito se consulta únicamente para RUC autorizado.</p>
+              <div class="identity-row"><input id="identifierInput" inputmode="numeric" maxlength="13" data-i18n-placeholder="identifierPlaceholder" placeholder="Cédula o RUC" /><button class="action" id="lookupBtn" data-i18n="verify">Verificar</button></div>
+              <div class="status-text" id="identityStatus"></div>
+            </div>
+            <div id="dossierSections"></div>
+            <div id="quoteEditor"></div>
+          </div>
+          <div class="tab-panel" id="tracesPanel" hidden>
+            <div class="trace-note" data-i18n="traceNote">Cada tarjeta muestra la fuente real, la llamada observada y un resultado saneado. Las credenciales y datos sensibles nunca aparecen aquí.</div>
+            <div id="traceList"></div>
+          </div>
         </div>
-      </div>
-
-      <div class="panel">
-        <h2>Delivery Timeline</h2>
-        <p class="sub">A compact state machine that makes the flow understandable at a glance.</p>
-        <div class="timeline" id="timeline"></div>
-      </div>
-    </section>
-
-    <section class="ruc-grid">
-      <div class="panel">
-        <span class="eyebrow">Trust anchor · Owner mode</span>
-        <h2 style="margin-top:16px;">Verificar empresa por RUC</h2>
-        <p class="sub">Intuito confirma la identidad; RalphiIA y Contífico aportan contexto. Nada se modifica sin aprobación.</p>
-        <div class="field"><label for="rucInput">RUC ecuatoriano</label><input id="rucInput" value="0992364866001" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" required /><div class="small" id="rucValidationHint">13 dígitos requeridos.</div></div>
-        <div class="btn-row">
-          <button class="primary" id="rucLookupBtn">Consultar y comparar</button>
-          <button class="ghost" id="rucNewBtn">Probar RUC nuevo</button>
-          <button class="secondary" id="rucRefreshBtn">Refrescar fuente</button>
-        </div>
-        <div class="card" style="margin-top:16px;">
-          <div class="field"><label for="approvedBy">Aprobado por</label><input id="approvedBy" value="Rafael" maxlength="120" required /></div>
-          <div class="row"><div class="field"><label for="clientPhone">Teléfono del cliente</label><input id="clientPhone" inputmode="tel" pattern="\+?[0-9][0-9 .()\-]{6,19}" placeholder="+593 99..." required /></div><div class="field"><label for="clientAddress">Dirección</label><input id="clientAddress" maxlength="300" required /></div></div>
-          <div class="row"><div class="field"><label for="contactEmail">Correo de contacto</label><input id="contactEmail" type="email" autocomplete="email" placeholder="cliente@dominio.com" required /></div><div class="field"><label for="billingEmail">Correo de facturación electrónica</label><input id="billingEmail" type="email" autocomplete="billing email" placeholder="facturacion@dominio.com" required /></div></div>
-          <button class="secondary" id="rucConfirmBtn" disabled>Confirmar creación / actualización</button>
-          <div class="small" id="rucConfirmHint" style="margin-top:10px;">Primero consulta y revisa la evidencia.</div>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Identity Reconciliation</h2>
-        <p class="sub">Datos oficiales, coincidencias internas, conflictos y borrador propuesto en una sola vista.</p>
-        <div class="chips" id="rucChips"><span class="chip">waiting for verification</span></div>
-        <div class="list" id="rucSignals" style="margin-top:14px;"></div>
-        <div class="card" style="margin-top:14px;"><pre id="rucJson">Introduce un RUC para iniciar.</pre></div>
-      </div>
-    </section>
-
-    <section class="operational-grid" id="operationsPanel">
-      <div class="panel">
-        <span class="eyebrow">Pagos · Evidencia real</span>
-        <h2 style="margin-top:16px;">IESS Control Room</h2>
-        <p class="sub">Planillas, comprobantes y confirmaciones recibidas por WhatsApp. Los históricos no verificados nunca se muestran como deuda.</p>
-        <div class="metric-strip" id="iessMetrics"></div>
-        <div class="list" id="iessList"><div class="card small">Cargando operaciones IESS...</div></div>
-      </div>
-      <div class="panel">
-        <span class="eyebrow">Banco del Pacífico · Staging</span>
-        <h2 style="margin-top:16px;">Reconciliation Radar</h2>
-        <p class="sub">Movimientos OCR, candidatos explicables y excepciones. La aprobación humana sigue siendo obligatoria.</p>
-        <div class="metric-strip" id="bankMetrics"></div>
-        <div class="list" id="bankList"><div class="card small">Cargando conciliación bancaria...</div></div>
-      </div>
-    </section>
-
-
-    <section class="grid2" id="smartQuoterPanel">
-      <div class="panel">
-        <span class="eyebrow">Reuse bridge · Port 2026</span>
-        <h2 style="margin-top:16px;">Smart Quoter legacy engine</h2>
-        <p class="sub">Consulta el motor existente sin escribir clientes ni cotizaciones. El resultado vuelve al expediente QuoteOps para revisión.</p>
-        <div class="field"><label for="smartQuoterText">Solicitud o transcripción</label><textarea id="smartQuoterText">El cliente necesita modernizar su control de acceso y conservar parte del sistema existente.</textarea></div>
-        <div class="btn-row"><button class="secondary" id="smartQuoterDiagnoseBtn">Ejecutar diagnóstico heredado</button></div>
-        <div class="small" id="smartQuoterHint" style="margin-top:10px;">Fuente: Smart Quoter 2026 · modo no destructivo.</div>
-      </div>
-      <div class="panel">
-        <h2>Legacy analysis handoff</h2>
-        <p class="sub">Separa hechos del motor anterior y deja visible la procedencia para el juez y el operador.</p>
-        <div class="chips" id="smartQuoterChips"><span class="chip">waiting for diagnosis</span></div>
-        <div class="card jsonbox" style="margin-top:14px;"><pre id="smartQuoterJson">Esperando diagnóstico...</pre></div>
-      </div>
-    </section>
-    <section class="grid2">
-      <div class="panel">
-        <h2>Reuse Map</h2>
-        <p class="sub">What we reuse from the RalphiIA platform and what is genuinely new in QuoteOps.</p>
-        <div class="list" id="reuseList"></div>
-      </div>
-      <div class="panel">
-        <h2>Trace Panel</h2>
-        <p class="sub">Observed health, verification results, and the control-plane facts the build week cares about.</p>
-        <div class="list" id="traceList"></div>
-      </div>
-    </section>
-
-    <div class="foot">
-      <span>Project: __PROJECT__</span>
-      <span>Correlation: __CORRELATION_ID__</span>
-      <span>Meta: __META_JSON__</span>
-    </div>
+      </aside>
+    </main>
   </div>
-
+  <div class="toast" id="toast"></div>
   <script id="bootstrap-data" type="application/json">__BOOTSTRAP_JSON__</script>
   <script>
     const bootstrap = JSON.parse(document.getElementById('bootstrap-data').textContent);
-    const reuseList = document.getElementById('reuseList');
-    const traceList = document.getElementById('traceList');
-    const analysisJson = document.getElementById('analysisJson');
-    const analysisChips = document.getElementById('analysisChips');
-    const analysisHint = document.getElementById('analysisHint');
-    const timeline = document.getElementById('timeline');
-    const rucJson = document.getElementById('rucJson');
-    const rucSignals = document.getElementById('rucSignals');
-    const rucChips = document.getElementById('rucChips');
-    const rucConfirmBtn = document.getElementById('rucConfirmBtn');
-    const rucConfirmHint = document.getElementById('rucConfirmHint');
-    let currentVerification = null;
+    const I18N = {
+      es: {
+        brandSub:'Proyectos que avanzan conversando', headline:'Cuéntame qué necesitas construir.', subhead:'Convirtamos una conversación, documentos y datos verificados en una cotización lista para aprobar.', currentStage:'Etapa actual', welcome:'Describe el proyecto con todo el detalle que tengas. Iré organizando el expediente y te preguntaré únicamente lo que falte.', femarTitle:'Empezar con el proyecto FEMAR', femarDesc:'Carga el caso de cambio o rehabilitación del control de acceso y continúa completándolo en conversación.', loadCase:'Cargar caso', messagePlaceholder:'Escribe aquí el proyecto, responde preguntas o pide preparar la cotización...', send:'Enviar', attachmentHint:'Hasta 30.000 caracteres · 20 archivos · 25 MB por archivo', enterHint:'Ctrl/⌘ + Enter para enviar', caseFile:'Expediente', connections:'Conexiones', projectProgress:'Progreso del proyecto', verifyCustomer:'Validar cliente', identityHelp:'Cédula de 10 dígitos o RUC de 13. Intuito se consulta únicamente para RUC autorizado.', identifierPlaceholder:'Cédula o RUC', verify:'Verificar', traceNote:'Cada tarjeta muestra la fuente real, la llamada observada y un resultado saneado. Las credenciales y datos sensibles nunca aparecen aquí.', customer:'Cliente', site:'Sitio', scope:'Alcance confirmado', assumptions:'Supuestos', risks:'Riesgos', questions:'Preguntas pendientes', options:'Opciones', attachments:'Adjuntos', noData:'Aún sin información', prepareQuote:'Preparar cotización', quote:'Cotización editable', description:'Descripción', qty:'Cant.', price:'Precio', total:'Total', savePrices:'Guardar valores', approve:'Aprobar y crear PDF', deliver:'Registrar entrega', approvedBy:'Aprobado por', openPdf:'Abrir PDF', phase_discovery:'Descubrimiento', phase_identity:'Cliente', phase_scope:'Alcance', phase_quote:'Cotización', phase_approval:'Aprobación', phase_delivery:'Entrega', status_ready:'Listo', status_ok:'Correcto', status_warning:'Atención', status_error:'Error', status_not_configured:'No configurado', status_pending:'Pendiente', status_locally_valid:'Validación local', status_verified:'Verificado', status_needs_review:'Requiere revisión', status_selected:'Seleccionado', status_stored:'Almacenado', invalidIdentifier:'Ingresa una cédula válida de 10 dígitos o un RUC válido de 13.', validating:'Validando y reconciliando fuentes...', locallyValid:'Cédula válida localmente', verifiedRuc:'RUC verificado por Intuito', fileStored:'archivo(s) almacenado(s)', source:'Fuente', call:'Llamada', status:'Estado', latency:'Latencia', time:'Hora', result:'Resultado', error:'No se pudo completar la operación.', missionFirst:'Inicia el expediente con un mensaje antes de validar al cliente.', saving:'Guardando...', noInventedPrices:'Los valores empiezan en cero para no inventar precios.', femarPrompt:'Proyecto FEMAR: necesitamos cambiar o rehabilitar el sistema de control de acceso existente. Debemos evaluar qué equipos pueden conservarse, levantar los accesos y puertas, identificar riesgos de compatibilidad y preparar opciones técnicas antes de cotizar. Tengo documentación para adjuntar y seguiré completando los datos en esta conversación.'
+      },
+      en: {
+        brandSub:'Projects that move forward through conversation', headline:'Tell me what you need to build.', subhead:'Let’s turn a conversation, documents, and verified data into an approval-ready quote.', currentStage:'Current stage', welcome:'Describe the project with all the detail you have. I will organize the case file and ask only for what is missing.', femarTitle:'Start with the FEMAR project', femarDesc:'Load the access-control replacement or rehabilitation case and keep completing it through conversation.', loadCase:'Load case', messagePlaceholder:'Describe the project, answer questions, or ask to prepare the quote...', send:'Send', attachmentHint:'Up to 30,000 characters · 20 files · 25 MB each', enterHint:'Ctrl/⌘ + Enter to send', caseFile:'Case file', connections:'Connections', projectProgress:'Project progress', verifyCustomer:'Validate customer', identityHelp:'10-digit national ID or 13-digit RUC. Intuito is called only for an authorized RUC.', identifierPlaceholder:'National ID or RUC', verify:'Validate', traceNote:'Each card shows the real source, observed call, and a sanitized result. Credentials and sensitive data never appear here.', customer:'Customer', site:'Site', scope:'Confirmed scope', assumptions:'Assumptions', risks:'Risks', questions:'Open questions', options:'Options', attachments:'Attachments', noData:'No information yet', prepareQuote:'Prepare quote', quote:'Editable quote', description:'Description', qty:'Qty.', price:'Price', total:'Total', savePrices:'Save values', approve:'Approve and create PDF', deliver:'Register delivery', approvedBy:'Approved by', openPdf:'Open PDF', phase_discovery:'Discovery', phase_identity:'Customer', phase_scope:'Scope', phase_quote:'Quote', phase_approval:'Approval', phase_delivery:'Delivery', status_ready:'Ready', status_ok:'OK', status_warning:'Warning', status_error:'Error', status_not_configured:'Not configured', status_pending:'Pending', status_locally_valid:'Locally valid', status_verified:'Verified', status_needs_review:'Needs review', status_selected:'Selected', status_stored:'Stored', invalidIdentifier:'Enter a valid 10-digit national ID or 13-digit RUC.', validating:'Validating and reconciling sources...', locallyValid:'National ID validated locally', verifiedRuc:'RUC verified by Intuito', fileStored:'file(s) stored', source:'Source', call:'Call', status:'Status', latency:'Latency', time:'Time', result:'Result', error:'The operation could not be completed.', missionFirst:'Start the case file with a message before validating the customer.', saving:'Saving...', noInventedPrices:'Values start at zero so no price is invented.', femarPrompt:'FEMAR project: we need to replace or rehabilitate the existing access-control system. We must assess which equipment can be kept, survey access points and doors, identify compatibility risks, and prepare technical options before quoting. I have documents to attach and will keep completing the information in this conversation.'
+      }
+    };
+    let language = localStorage.getItem('quoteops.language') || 'es';
+    let missionId = localStorage.getItem('quoteops.mission_id') || '';
+    let dossier = null;
+    let selectedFiles = [];
+    const $ = (id) => document.getElementById(id);
+    const t = (key) => I18N[language][key] || key;
+    const statusText = (value) => t(`status_${value}`);
+    const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
-    const phases = ['intake', 'analysis', 'draft', 'review', 'delivery', 'done'];
-    const phaseLabels = { intake: 'Intake', analysis: 'Analysis', draft: 'Draft', review: 'Review', delivery: 'Delivery', done: 'Done' };
-
-    function renderTimeline(active = 'analysis') {
-      timeline.innerHTML = '';
-      phases.forEach((phase) => {
-        const el = document.createElement('div');
-        el.className = 'step' + (phase === active ? ' active' : '') + (phases.indexOf(phase) < phases.indexOf(active) ? ' done' : '');
-        el.innerHTML = `<div><div style="font-weight:700;">${phaseLabels[phase]}</div><div class="small">${phase === 'analysis' ? 'Structured output and risk review' : 'Operational state'}</div></div><div class="status-dot ${phase === active ? 'wait' : (phases.indexOf(phase) < phases.indexOf(active) ? 'ok' : '')}"></div>`;
-        timeline.appendChild(el);
-      });
-    }
-
-    function renderReuse(data) {
-      reuseList.innerHTML = '';
-      const reuse = data.catalog?.reuse_first || [];
-      const fresh = data.catalog?.new_for_quoteops || [];
-      [[reuse, 'Reused stack'], [fresh, 'New in QuoteOps']].forEach(([items, title]) => {
-        const group = document.createElement('div');
-        group.className = 'card';
-        group.innerHTML = `<h3>${title}</h3><div class="small">${items.length} items</div>`;
-        const list = document.createElement('div');
-        list.className = 'list';
-        items.forEach((item) => {
-          const row = document.createElement('div');
-          row.className = 'card';
-          row.innerHTML = `<h3>${item.name}</h3><div class="small">${item.description}</div><div class="small" style="margin-top:8px;">${item.source}</div>`;
-          list.appendChild(row);
-        });
-        group.appendChild(list);
-        reuseList.appendChild(group);
-      });
-    }
-
-    function renderTrace(results) {
-      traceList.innerHTML = '';
-      const cards = [
-        { label: 'Task', value: bootstrap.task_id },
-        { label: 'Correlation', value: bootstrap.correlation_id },
-        { label: 'Reuse count', value: bootstrap.reuse_count },
-        { label: 'New count', value: bootstrap.new_count },
-      ];
-      cards.forEach(({ label, value }) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `<div class="badge">${label}</div><div style="font-size:20px;font-weight:700;margin-top:6px;">${value}</div>`;
-        traceList.appendChild(card);
-      });
-      (results || []).forEach((result) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `<h3>${result.name}</h3><div class="small">${result.url}</div><div class="small" style="margin-top:8px;">HTTP ${result.status_code} · ${result.ok ? 'reachable' : 'check'}</div>`;
-        traceList.appendChild(card);
-      });
-    }
-
-    function setAnalysis(data, label) {
-      analysisJson.textContent = JSON.stringify(data, null, 2);
-      analysisHint.textContent = label;
-      analysisChips.innerHTML = '';
-      const chips = [
-        data.analysis_source ? `source: ${data.analysis_source}` : 'source: unknown',
-        data.model_used ? `model: ${data.model_used}` : null,
-        data.review?.status ? `review: ${data.review.status}` : null,
-        data.next_action ? `next: ${data.next_action}` : null,
-      ].filter(Boolean);
-      chips.forEach((text) => {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = text;
-        analysisChips.appendChild(chip);
-      });
-      renderTimeline(data.mission?.status || 'analysis');
-    }
-
-    async function fetchJson(url, options) {
+    async function fetchJson(url, options = {}) {
+      options.headers = {...(options.headers || {}), 'x-quoteops-language': language};
       const response = await fetch(url, options);
-      const data = await response.json();
-      if (!response.ok) {
-        const error = new Error(data.detail?.message || 'Request failed');
-        error.payload = data;
-        throw error;
-      }
-      return data;
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) { const error = new Error(payload?.detail?.message || payload?.detail || payload?.message || t('error')); error.payload = payload; throw error; }
+      return payload;
     }
-
-    function renderRucResult(data) {
-      currentVerification = data.verification;
-      rucJson.textContent = JSON.stringify(data, null, 2);
-      rucConfirmBtn.disabled = false;
-      rucConfirmHint.textContent = `Acción propuesta: ${data.customer_draft.recommended_action}. Persistencia: ${data.persistence_target}.`;
-      rucChips.innerHTML = '';
-      [
-        `source: ${data.verification.source}`,
-        `status: ${data.verification.upstream_status}`,
-        `matches: ${data.comparison.matches.length}`,
-        `conflicts: ${data.comparison.conflicts.length}`,
-        `checksum: ${data.verification.checksum_valid ? 'valid' : 'provider-confirmed / local warning'}`,
-      ].forEach((label) => {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = label;
-        rucChips.appendChild(chip);
-      });
-      const verification = data.verification;
-      const firstSite = verification.establishments[0];
-      const signals = [
-        ['Verified legal name', verification.legal_name || 'Not returned'],
-        ['Commercial name', verification.commercial_name || 'Not returned'],
-        ['Economic activity', verification.activity || 'Not returned'],
-        ['Primary establishment', firstSite?.full_address || 'Not returned'],
-        ['RalphiIA / Contífico', data.comparison.matches.map((item) => item.source).join(', ') || 'No existing match'],
-        ['Human gate', 'Required before create or update'],
-      ];
-      rucSignals.innerHTML = '';
-      signals.forEach(([label, value], index) => {
-        const card = document.createElement('div');
-        card.className = 'signal';
-        const strong = document.createElement('strong');
-        strong.className = index === 0 ? 'verified' : '';
-        strong.textContent = value;
-        const span = document.createElement('span');
-        span.textContent = label;
-        card.append(strong, span);
-        rucSignals.appendChild(card);
-      });
+    function escapeHtml(value) { const el = document.createElement('span'); el.textContent = String(value ?? ''); return el.innerHTML; }
+    function showToast(message) { const el = $('toast'); el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
+    function appendMessage(role, text) { const el = document.createElement('div'); el.className = `message ${role}`; const label = document.createElement('small'); label.textContent = role === 'assistant' ? 'QuoteOps' : (language === 'es' ? 'Tú' : 'You'); const body = document.createElement('span'); body.textContent = text; el.append(label, body); $('messages').appendChild(el); $('messages').scrollTop = $('messages').scrollHeight; }
+    function applyLanguage() {
+      document.documentElement.lang = language;
+      localStorage.setItem('quoteops.language', language);
+      document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+      document.querySelectorAll('.lang button').forEach((el) => el.classList.toggle('active', el.dataset.lang === language));
+      if (dossier) renderDossier(dossier);
+      if (missionId) loadMission();
+      renderTraces(bootstrap.integration_traces || []);
     }
-
-    function validateRucInput(value) {
-      const normalized = String(value || '').trim();
-      if (!/^[0-9]{13}$/.test(normalized)) return 'El RUC debe contener exactamente 13 dígitos.';
-      return '';
+    function phaseText(phase) { return t(`phase_${phase || 'discovery'}`); }
+    function values(section) { return Array.isArray(section) ? section : []; }
+    function listSection(title, items) {
+      const content = items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : `<div class="empty">${t('noData')}</div>`;
+      return `<div class="section"><h3>${title}</h3>${content}</div>`;
     }
-
-    function validateContactInput(value) {
-      const normalized = String(value || '').trim();
-      if (!normalized) return 'El contacto es obligatorio.';
-      const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-      const phone = /^\+?[0-9][0-9 .()\-]{6,19}$/;
-      return email.test(normalized) || phone.test(normalized) ? '' : 'Usa un correo o teléfono válido.';
+    function renderDossier(data) {
+      dossier = data;
+      const customer = data.customer || {};
+      const site = data.site || {};
+      $('progressValue').textContent = `${data.progress || 0}%`;
+      $('progressBar').style.width = `${data.progress || 0}%`;
+      const customerItems = [customer.name, customer.identifier, customer.verification_status && customer.verification_status !== 'pending' ? statusText(customer.verification_status) : '', customer.source].filter(Boolean);
+      const siteItems = [site.location, site.access_points ? `${site.access_points} ${language === 'es' ? 'accesos' : 'access points'}` : '', ...(site.operating_constraints || [])].filter(Boolean);
+      const attachmentItems = values(data.attachments).map((item) => `${item.name} · ${item.status === 'stored' ? statusText('stored') + ' · SHA-256 ' + item.sha256.slice(0,8) : statusText(item.status)}`);
+      let html = '';
+      html += listSection(t('customer'), customerItems);
+      html += listSection(t('site'), siteItems);
+      html += listSection(t('scope'), values(data.confirmed_scope));
+      html += listSection(t('assumptions'), values(data.assumptions));
+      html += listSection(t('risks'), values(data.risks));
+      html += listSection(t('questions'), values(data.questions));
+      if (values(data.options).length) html += `<div class="section"><h3>${t('options')}</h3>${data.options.map((item) => `<div class="option"><strong>${escapeHtml(item.code)} · ${escapeHtml(item.title)}</strong><span>${escapeHtml(item.summary)}</span></div>`).join('')}</div>`;
+      html += listSection(t('attachments'), attachmentItems);
+      if (!data.quote && values(data.confirmed_scope).length) html += `<button class="action" id="prepareQuoteBtn">${t('prepareQuote')}</button>`;
+      $('dossierSections').innerHTML = html;
+      $('prepareQuoteBtn')?.addEventListener('click', () => sendMessage(language === 'es' ? 'Preparar cotización editable' : 'Prepare the editable quote'));
+      renderQuote(data.quote);
     }
-
-    function validateIntakeForm() {
-      const errors = [];
-      if (!document.getElementById('customer_name').value.trim()) errors.push('Nombre');
-      if (validateContactInput(document.getElementById('contact').value)) errors.push('Contacto');
-      if (!document.getElementById('original_text').value.trim()) errors.push('Solicitud');
-      return errors;
+    function renderQuote(quote) {
+      if (!quote) { $('quoteEditor').innerHTML = ''; return; }
+      const lines = (quote.lines || []).map((line) => `<div class="quote-line" data-line-id="${escapeHtml(line.line_id)}"><input class="line-desc" value="${escapeHtml(line.description)}" aria-label="${t('description')}" /><input class="line-qty" type="number" min="0.01" step="0.01" value="${line.quantity}" aria-label="${t('qty')}" /><input class="line-price" type="number" min="0" step="0.01" value="${line.unit_price}" aria-label="${t('price')}" /></div>`).join('');
+      const approvedBy = localStorage.getItem('quoteops.approved_by') || 'Rafael';
+      $('quoteEditor').innerHTML = `<div class="section"><h3>${t('quote')}</h3><div class="empty">${t('noInventedPrices')}</div>${lines}<div class="quote-totals"><span>${t('total')}</span><span>USD ${Number(quote.total || 0).toFixed(2)}</span></div><input id="approvedByInput" value="${escapeHtml(approvedBy)}" placeholder="${t('approvedBy')}" style="margin-top:10px" /><div class="quote-actions"><button class="action secondary" id="saveQuoteBtn">${t('savePrices')}</button><button class="action" id="approveQuoteBtn" ${quote.status !== 'draft' ? 'disabled' : ''}>${t('approve')}</button><button class="action" id="deliverQuoteBtn" ${quote.status !== 'approved' ? 'disabled' : ''}>${t('deliver')}</button></div>${quote.pdf_url ? `<p><a class="pdf-link" target="_blank" rel="noopener" href="${escapeHtml(quote.pdf_url)}">${t('openPdf')}</a></p>` : ''}</div>`;
+      $('saveQuoteBtn').addEventListener('click', saveQuote);
+      $('approveQuoteBtn').addEventListener('click', approveQuote);
+      $('deliverQuoteBtn').addEventListener('click', deliverQuote);
     }
-
-    async function lookupRuc(forceRefresh = false) {
-      const rucError = validateRucInput(document.getElementById('rucInput').value);
-      const hint = document.getElementById('rucValidationHint');
-      hint.textContent = rucError || 'Formato local válido; se verificará con Intuito.';
-      hint.className = rucError ? 'small' : 'small verified';
-      if (rucError) { rucJson.textContent = rucError; return; }
-      rucConfirmBtn.disabled = true;
-      rucJson.textContent = 'Consultando Intuito y reconciliando fuentes...';
+    async function sendMessage(forcedText = '') {
+      const text = forcedText || $('messageInput').value.trim();
+      if (!text && !selectedFiles.length) return;
+      $('sendBtn').disabled = true;
+      if (text) appendMessage('user', text);
+      const files = [...selectedFiles];
       try {
-        const data = await fetchJson('/api/ruc/lookup', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ ruc: document.getElementById('rucInput').value, force_refresh: forceRefresh, mode: 'owner' }),
-        });
-        renderRucResult(data);
-      } catch (error) {
-        currentVerification = null;
-        rucJson.textContent = JSON.stringify(error.payload || { error: error.message }, null, 2);
-        rucConfirmHint.textContent = 'Consulta bloqueada; revisa el error y el trace ID.';
-      }
+        let result = await fetchJson('/api/conversation/messages', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ mission_id:missionId, idempotency_key:newKey(), language, message:text, attachments:files.map((file) => ({name:file.name, media_type:file.type || 'application/octet-stream', size_bytes:file.size})) }) });
+        missionId = result.mission_id; localStorage.setItem('quoteops.mission_id', missionId); $('starter')?.remove();
+        let stored = 0;
+        for (const file of files) {
+          const form = new FormData(); form.append('file', file); form.append('language', language);
+          result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/attachments`, {method:'POST', body:form}); stored += 1;
+        }
+        if (stored) showToast(`${stored} ${t('fileStored')}`);
+        appendMessage('assistant', result.assistant_message); renderMission(result); $('messageInput').value = ''; selectedFiles = []; renderSelectedFiles();
+      } catch (error) { showToast(error.message); }
+      finally { $('sendBtn').disabled = false; }
     }
-
-    function validateCustomerFields() {
-      const ids = ['approvedBy', 'clientPhone', 'clientAddress', 'contactEmail', 'billingEmail'];
-      for (const id of ids) { const field = document.getElementById(id); if (!field.checkValidity()) { field.reportValidity(); return false; } }
-      return true;
-    }
-
-    async function confirmRuc() {
-      if (!currentVerification || !validateCustomerFields()) return;
-      rucConfirmBtn.disabled = true;
+    function renderHistory(history) { if (!history?.length) return; $('messages').innerHTML = ''; history.forEach((item) => appendMessage(item.role, item.text)); }
+    function renderMission(result) { dossier = result.dossier; $('phaseLabel').textContent = phaseText(result.phase); $('runtimeLabel').textContent = result.runtime_label || bootstrap.runtime_label; renderHistory(result.history); renderDossier(result.dossier); }
+    async function loadMission() { try { const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}?language=${language}`); renderMission(result); } catch { localStorage.removeItem('quoteops.mission_id'); missionId = ''; } }
+    function renderSelectedFiles() { $('selectedFiles').innerHTML = selectedFiles.map((file) => `<span class="file-chip">${escapeHtml(file.name)} · ${(file.size/1024).toFixed(0)} KB</span>`).join(''); }
+    async function lookupCustomer() {
+      if (!missionId) { showToast(t('missionFirst')); return; }
+      const identifier = $('identifierInput').value.replace(/\D/g,'');
+      if (![10,13].includes(identifier.length)) { $('identityStatus').textContent = t('invalidIdentifier'); return; }
+      $('identityStatus').textContent = t('validating'); $('lookupBtn').disabled = true;
       try {
-        const result = await fetchJson('/api/ruc/confirm', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            ruc: currentVerification.ruc,
-            approved_by: document.getElementById('approvedBy').value,
-            expected_verification_id: currentVerification.verification_id,
-            contact_email: document.getElementById('contactEmail').value,
-            billing_email: document.getElementById('billingEmail').value,
-            phone: document.getElementById('clientPhone').value,
-            address: document.getElementById('clientAddress').value,
-          }),
-        });
-        rucConfirmHint.textContent = `${result.action.toUpperCase()} · party ${result.party_id} · client ${result.client_id} · duplicates ${result.duplicate_count}`;
-        await lookupRuc(false);
-      } catch (error) {
-        rucConfirmHint.textContent = error.payload?.detail?.message || error.message;
-        rucConfirmBtn.disabled = false;
-      }
+        const result = await fetchJson('/api/customer/lookup', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({identifier, mission_id:missionId, language, force_refresh:false})});
+        $('identityStatus').textContent = result.provider_called ? t('verifiedRuc') : t('locallyValid'); await loadMission(); await refreshTraces();
+      } catch (error) { $('identityStatus').textContent = error.message; }
+      finally { $('lookupBtn').disabled = false; }
     }
-
-
-    async function runSmartQuoterDiagnosis() {
-      const text = document.getElementById('smartQuoterText').value.trim();
-      const hint = document.getElementById('smartQuoterHint');
-      const output = document.getElementById('smartQuoterJson');
-      if (!text) { hint.textContent = 'Escribe una solicitud antes de consultar.'; return; }
-      hint.textContent = 'Consultando Smart Quoter 2026...';
-      try {
-        const data = await fetchJson('/api/smart-quoter/diagnose', {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transcription: text }),
-        });
-        output.textContent = JSON.stringify(data, null, 2);
-        document.getElementById('smartQuoterChips').innerHTML = '<span class="chip">source: Smart Quoter 2026</span><span class="chip">write: blocked</span><span class="chip">handoff: QuoteOps review</span>';
-        hint.textContent = 'Diagnóstico recibido; ninguna escritura fue ejecutada.';
-      } catch (error) {
-        output.textContent = JSON.stringify(error.payload || { error: error.message }, null, 2);
-        hint.textContent = 'Smart Quoter no disponible o devolvió un error.';
-      }
+    function quoteLines() { return [...document.querySelectorAll('.quote-line')].map((row) => ({line_id:row.dataset.lineId, description:row.querySelector('.line-desc').value, quantity:Number(row.querySelector('.line-qty').value), unit_price:Number(row.querySelector('.line-price').value)})); }
+    async function saveQuote() { try { const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/quote`, {method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, lines:quoteLines(), tax_rate:0})}); renderMission(result); showToast(t('savePrices')); } catch(error) { showToast(error.message); } }
+    async function approveQuote() { const approvedBy = $('approvedByInput').value.trim(); localStorage.setItem('quoteops.approved_by', approvedBy); try { const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/approve`, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, approved_by:approvedBy, access_mode:'judge'})}); appendMessage('assistant', result.assistant_message); renderMission(result); await refreshTraces(); } catch(error) { showToast(error.message); } }
+    async function deliverQuote() { try { const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/deliver`, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, channels:['download'], access_mode:'judge'})}); appendMessage('assistant', result.assistant_message); renderMission(result); } catch(error) { showToast(error.message); } }
+    function renderTraces(items) {
+      $('traceList').innerHTML = (items || []).map((item) => `<div class="trace-card ${escapeHtml(item.status)}"><div class="trace-head"><strong>${escapeHtml(item.integration)}</strong><span>${escapeHtml(statusText(item.status))}</span></div><dl><dt>${t('source')}</dt><dd>${escapeHtml(item.source)}</dd><dt>${t('call')}</dt><dd>${escapeHtml(item.call)}</dd><dt>${t('latency')}</dt><dd>${Number(item.latency_ms || 0).toFixed(1)} ms</dd><dt>${t('time')}</dt><dd>${escapeHtml(new Date(item.observed_at).toLocaleTimeString(language))}</dd><dt>${t('result')}</dt><dd>${escapeHtml(item.result)}</dd></dl></div>`).join('');
     }
-
-    async function refreshReuse() {
-      const reuse = await fetchJson('/api/reuse');
-      const verify = await fetchJson('/api/reuse/verify');
-      renderReuse(reuse);
-      renderTrace(verify.results || []);
-      document.getElementById('reuseCount').textContent = reuse.reuse_count;
-      document.getElementById('newCount').textContent = reuse.new_count;
-      document.getElementById('stackStatus').textContent = verify.ok ? 'OK' : 'Check';
-    }
-
-    function metric(label, value) {
-      return `<div class="metric"><span class="small">${label}</span><strong>${value}</strong></div>`;
-    }
-
-    function safeText(value, fallback = 'N/D') {
-      return value === undefined || value === null || value === '' ? fallback : String(value);
-    }
-
-    function escapeHtml(value, fallback = 'N/D') {
-      const element = document.createElement('span');
-      element.textContent = safeText(value, fallback);
-      return element.innerHTML;
-    }
-
-    async function refreshOperations() {
-      try {
-        const data = await fetchJson('/api/operations/summary');
-        const iess = data.iess;
-        const bank = data.bank;
-        document.getElementById('iessMetrics').innerHTML = [
-          metric('Planillas', iess.total_vouchers), metric('Verificadas', iess.paid_verified),
-          metric('Históricas', iess.paid_unverified), metric('Por confirmar', iess.awaiting_confirmation),
-        ].join('');
-        const payment = iess.latest_payment || {};
-        const voucherRows = (iess.recent_vouchers || []).slice(0, 5).map((item) =>
-          `<div class="card"><h3>${escapeHtml(item.periodo, 'Periodo pendiente')} · ${escapeHtml(item.status)}</h3><div class="small">Planilla ${escapeHtml(item.comprobante_id)} · USD ${Number(item.total_planilla || item.amount_paid || 0).toFixed(2)}</div></div>`
-        ).join('');
-        document.getElementById('iessList').innerHTML =
-          `<div class="card"><div class="badge">Último pago WhatsApp</div><div class="money">USD ${Number(payment.amount || 0).toFixed(2)}</div><div class="small">${escapeHtml(payment.payment_id, 'Sin pago confirmado')} · referencia ${escapeHtml(payment.reference)}</div></div>${voucherRows}`;
-        document.getElementById('bankMetrics').innerHTML = [
-          metric('Estados', bank.statement_count), metric('Movimientos', bank.transaction_count),
-          metric('Candidatos', bank.candidate_count), metric('Excepciones', bank.exception_count),
-        ].join('');
-        const statement = bank.latest_statement || {};
-        const candidates = (bank.recent_candidates || []).map((item) =>
-          `<div class="card"><h3>${escapeHtml(item.party_name)} · USD ${Number(item.amount || 0).toFixed(2)}</h3><div class="small">Score ${escapeHtml(item.score)} · ${escapeHtml((item.reasons || []).join(' · '))}</div><div class="chips" style="margin-top:8px;"><span class="chip">${escapeHtml(item.status)}</span><span class="chip">aprobación humana</span></div></div>`
-        ).join('');
-        document.getElementById('bankList').innerHTML =
-          `<div class="card"><div class="badge">Último estado</div><h3>${escapeHtml(statement.source_file)}</h3><div class="small">${escapeHtml(statement.statement_period_start)} a ${escapeHtml(statement.statement_period_end)} · diferencia USD ${Number(statement.balance_difference || 0).toFixed(2)} · ${escapeHtml(statement.continuity_status)}</div></div>${candidates || '<div class="card small">No hay candidatos pendientes.</div>'}`;
-      } catch (error) {
-        document.getElementById('iessList').innerHTML = '<div class="card small">Resumen operativo temporalmente no disponible.</div>';
-        document.getElementById('bankList').innerHTML = '<div class="card small">Resumen operativo temporalmente no disponible.</div>';
-      }
-    }
-
-    async function analyze(endpoint) {
-      const validationErrors = validateIntakeForm();
-      if (validationErrors.length) { analysisHint.textContent = `Campos inválidos: ${validationErrors.join(', ')}`; return; }
-      const payload = {
-        source_channel: document.getElementById('source_channel').value,
-        customer_name: document.getElementById('customer_name').value,
-        contact: document.getElementById('contact').value,
-        original_text: document.getElementById('original_text').value,
-        attachments: document.getElementById('attachments').value.split(',').map((item) => item.trim()).filter(Boolean),
-      };
-      const data = await fetchJson(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      setAnalysis(data, endpoint.includes('analyze') ? 'GPT-5.6-backed analysis or fallback executed.' : 'Deterministic fallback preview generated.');
-    }
-
-    document.getElementById('analyzeBtn').addEventListener('click', () => analyze('/api/intake/analyze'));
-    document.getElementById('previewBtn').addEventListener('click', () => analyze('/api/intake/preview'));
-    document.getElementById('verifyBtn').addEventListener('click', refreshReuse);
-    document.getElementById('smartQuoterDiagnoseBtn').addEventListener('click', runSmartQuoterDiagnosis);
-    document.getElementById('rucLookupBtn').addEventListener('click', () => lookupRuc(false));
-    document.getElementById('rucRefreshBtn').addEventListener('click', () => lookupRuc(true));
-    document.getElementById('rucNewBtn').addEventListener('click', () => {
-      document.getElementById('rucInput').value = '0993402875001';
-      lookupRuc(true);
-    });
-    rucConfirmBtn.addEventListener('click', confirmRuc);
-    document.getElementById('rucInput').addEventListener('input', (event) => { event.target.value = event.target.value.replace(/[^0-9]/g, '').slice(0, 13); });
-
-    renderTimeline('analysis');
-    refreshReuse();
-    refreshOperations();
-    fetchJson('/api/intake/preview', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        source_channel: 'sandbox',
-        customer_name: 'Ana',
-        contact: 'ana@example.com',
-        original_text: 'Necesito una cotización para automatizar WhatsApp, PDFs y seguimiento de entrega.',
-        attachments: ['brief.pdf']
-      })
-    }).then((data) => setAnalysis(data, 'Bootstrapped with fallback preview.'));
+    async function refreshTraces() { try { const data = await fetchJson('/api/integrations/trace'); $('runtimeLabel').textContent = data.runtime_label; renderTraces(data.items); } catch {} }
+    document.querySelectorAll('.lang button').forEach((button) => button.addEventListener('click', () => { language = button.dataset.lang; applyLanguage(); }));
+    document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('.tabs button').forEach((item) => item.classList.toggle('active', item === button)); $('dossierPanel').hidden = button.dataset.tab !== 'dossier'; $('tracesPanel').hidden = button.dataset.tab !== 'traces'; if (button.dataset.tab === 'traces') refreshTraces(); }));
+    $('attachBtn').addEventListener('click', () => $('fileInput').click());
+    $('fileInput').addEventListener('change', (event) => { selectedFiles = [...event.target.files].slice(0,20); renderSelectedFiles(); });
+    $('sendBtn').addEventListener('click', () => sendMessage());
+    $('messageInput').addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') sendMessage(); });
+    $('femarBtn').addEventListener('click', () => { $('messageInput').value = t('femarPrompt'); $('messageInput').focus(); });
+    $('lookupBtn').addEventListener('click', lookupCustomer);
+    $('identifierInput').addEventListener('input', (event) => { event.target.value = event.target.value.replace(/\D/g,'').slice(0,13); });
+    $('runtimeLabel').textContent = bootstrap.runtime_label;
+    renderTraces(bootstrap.integration_traces || []);
+    applyLanguage();
+    if (missionId) loadMission();
+    setInterval(refreshTraces, 10000);
   </script>
 </body>
 </html>"""
-    return (
-        template
-        .replace("__BOOTSTRAP_JSON__", bootstrap_json)
-        .replace("__META_JSON__", meta_json)
-        .replace("__PROJECT__", html.escape(bootstrap["project"]))
-        .replace("__CORRELATION_ID__", html.escape(bootstrap["correlation_id"]))
-        .replace("__TASK_ID__", html.escape(bootstrap["task_id"]))
-        .replace("__REUSE_COUNT__", str(bootstrap["reuse_count"]))
-        .replace("__NEW_COUNT__", str(bootstrap["new_count"]))
-        .replace("__STACK_STATUS__", 'OK' if bootstrap["stack_ok"] else 'Check')
-    )
+    return template.replace("__BOOTSTRAP_JSON__", bootstrap_json)

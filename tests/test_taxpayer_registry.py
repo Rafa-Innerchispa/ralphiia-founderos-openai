@@ -7,7 +7,9 @@ from quoteops.adapters.customer_identity import compare_customer
 from quoteops.adapters.taxpayer_registry import (
     IntuitoAzureRucAdapter,
     TaxpayerRegistryError,
+    ecuador_cedula_checksum_valid,
     ecuador_ruc_checksum_valid,
+    normalize_ec_identifier,
     normalize_ruc,
 )
 from quoteops.contracts import IdentityMatch
@@ -19,6 +21,13 @@ class TestTaxpayerRegistry(unittest.TestCase):
         with self.assertRaises(TaxpayerRegistryError):
             normalize_ruc("09923ABC")
         self.assertTrue(ecuador_ruc_checksum_valid("0992364866001"))
+
+    def test_cedula_and_ruc_share_local_identifier_boundary(self) -> None:
+        self.assertTrue(ecuador_cedula_checksum_valid("1710034065"))
+        self.assertEqual(normalize_ec_identifier("1710034065"), ("1710034065", "cedula"))
+        self.assertEqual(normalize_ec_identifier("0992364866001"), ("0992364866001", "ruc"))
+        with self.assertRaises(TaxpayerRegistryError):
+            normalize_ec_identifier("1710034064")
 
     def test_live_contract_token_cache_and_normalization(self) -> None:
         calls = {"token": 0, "lookup": 0}

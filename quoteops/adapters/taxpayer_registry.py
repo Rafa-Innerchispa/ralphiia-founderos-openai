@@ -56,6 +56,35 @@ def normalize_ruc(value: str) -> str:
     return clean
 
 
+def ecuador_cedula_checksum_valid(value: str) -> bool:
+    clean = str(value or "").strip().replace("-", "").replace(" ", "")
+    if not clean.isdigit() or len(clean) != 10:
+        return False
+    province = int(clean[:2])
+    if province not in range(1, 25) or int(clean[2]) > 5:
+        return False
+    total = 0
+    for index, digit in enumerate(clean[:9]):
+        product = int(digit) * (2 if index % 2 == 0 else 1)
+        total += product - 9 if product > 9 else product
+    return (10 - total % 10) % 10 == int(clean[9])
+
+
+def normalize_ec_identifier(value: str) -> tuple[str, str]:
+    clean = str(value or "").strip().replace("-", "").replace(" ", "")
+    if len(clean) == 10 and ecuador_cedula_checksum_valid(clean):
+        return clean, "cedula"
+    if len(clean) == 13:
+        ruc = normalize_ruc(clean)
+        if ecuador_ruc_checksum_valid(ruc):
+            return ruc, "ruc"
+    raise TaxpayerRegistryError(
+        "invalid_ec_identifier",
+        "La cédula o RUC no supera la validación local ecuatoriana.",
+        status_code=422,
+    )
+
+
 def ecuador_ruc_checksum_valid(ruc: str) -> bool:
     clean = normalize_ruc(ruc)
     third = int(clean[2])
