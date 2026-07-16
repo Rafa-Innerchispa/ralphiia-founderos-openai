@@ -7,14 +7,14 @@
 - Primary project: QuoteOps
 - Canonical host: `ralphi-ia-ver-10` (`192.168.1.4`)
 - Canonical repository: `/home/rlopez/projects/ralphiia-quoteops`
-- Role: sole writer for the conversation-first P0 until commit and handoff
+- Role: QuoteOps writer; Astro is owned by Gemini/Visual Code through a separate repository
 - Runtime safety: staging only; production writes disabled; Smart Quoter `:2026` read-only
-- Current status: conversation API, progressive mission, ES/EN UI, Ecuadorian identity boundary, integration traces, editable quote, approval, PDF, and registered isolated delivery implemented; staging visual/API verification pending
+- Current status: conversation-first P0 committed as `97e06a3`; sanitized public progress contract is live in staging with 45/45 tests passing and awaiting its separate commit
 - Baseline commit: `efa08e5`
 
 ## Coordination
 
-Rafael approved two parallel Codex tasks with explicit ownership. `Hackathon OpenAI · Principal` retains user-facing coordination and prepares submission evidence in a separate workspace. This session owns the P0 code and the files listed in the delegation. Handoffs are sent through Codex task messages and the RalphiIA MCP agent inbox.
+Rafael approved parallel work with explicit ownership. `Hackathon OpenAI · Principal` retains user-facing coordination and submission evidence. Gemini/Visual Code owns `/home/rlopez/projects/hackathon-autopilot/staging/innerchispa-web`; this session does not edit Astro. The Astro contract was delivered to `gemini/INBOX.md` as message `msg_1471913d0bb25982`.
 
 ## Guardrails
 

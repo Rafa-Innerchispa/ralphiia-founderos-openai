@@ -386,3 +386,54 @@ class IntegrationTrace(BaseModel):
     latency_ms: float = Field(default=0, ge=0)
     observed_at: str
     result: str
+
+
+class PublicProgressSummary(BaseModel):
+    title: str = Field(max_length=200)
+    status: Literal["active", "paused", "completed", "blocked"]
+    phase: str = Field(max_length=160)
+    progress_percent: int = Field(ge=0, le=100)
+
+
+class PublicProgressVerification(BaseModel):
+    tests_passed: int = Field(ge=0)
+    tests_total: int = Field(ge=0)
+    staging_status: Literal["healthy", "degraded", "offline", "not_verified"]
+    commit: str = Field(pattern=r"^(?:unknown|[a-f0-9]{7,40})$")
+
+
+class PublicProgressDecision(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    title: str = Field(max_length=200)
+    summary: str = Field(max_length=800)
+    status: Literal["accepted", "reviewing", "superseded"]
+    decided_at: str
+
+
+class PublicProgressEvent(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    type: Literal["milestone", "commit", "verification", "decision", "release"]
+    title: str = Field(max_length=200)
+    summary: str = Field(max_length=800)
+    status: Literal["completed", "in_progress", "blocked"]
+    occurred_at: str
+    evidence: dict[str, str] = Field(default_factory=dict)
+
+
+class PublicIntegrationStatus(BaseModel):
+    name: str = Field(max_length=80)
+    status: Literal["ready", "ok", "warning", "error", "not_configured"]
+
+
+class PublicProgressResponse(BaseModel):
+    ok: bool = True
+    project: Literal["ralphiia-quoteops"] = "ralphiia-quoteops"
+    language: LanguageCode
+    generated_at: str
+    revision: str = Field(pattern=r"^[a-f0-9]{16}$")
+    refresh_seconds: int = Field(ge=10, le=300)
+    summary: PublicProgressSummary
+    verification: PublicProgressVerification
+    decisions: list[PublicProgressDecision] = Field(default_factory=list, max_length=30)
+    events: list[PublicProgressEvent] = Field(default_factory=list, max_length=50)
+    integrations: list[PublicIntegrationStatus] = Field(default_factory=list, max_length=20)

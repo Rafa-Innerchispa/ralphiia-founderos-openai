@@ -23,3 +23,11 @@
 - Changed deterministic intake metadata from a model-like fallback label to `deterministic_rules`.
 - Added unit and API integration coverage for conversation, language, attachments, identity validation, idempotency, quote transition, approval, PDF, and delivery.
 - Preserved all unrelated untracked parser, reconciliation, cash-flow, and watchdog files.
+
+## Public progress feed
+
+- Added a bilingual, read-only `GET /api/public/progress` contract for the separate Astro website.
+- Added a curated public manifest for milestones, decisions, verification evidence, and H1-H7 progress.
+- Reduced integration visibility to name and status only in the public projection; internal sources, calls, latency, results, customer data, documents, and identifiers remain private.
+- Added defensive redaction for Ecuadorian identifiers, IP addresses, local paths, and secret-like values.
+- Added stable revisions and a 15-second refresh hint so a static Astro site can update without rebuilding.

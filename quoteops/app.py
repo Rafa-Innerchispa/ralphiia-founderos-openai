@@ -8,7 +8,7 @@ from platform import node
 import re
 from time import perf_counter
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
@@ -27,6 +27,7 @@ from quoteops.contracts import (
     MissionDeliveryRequest,
     QuoteIntake,
     QuoteIntakeAnalysis,
+    PublicProgressResponse,
     QuoteUpdateRequest,
     QuoteToolPlan,
     RucConfirmationResult,
@@ -40,10 +41,11 @@ from quoteops.frontend import render_cockpit_page
 from quoteops.iess_payments import IessPaymentService
 from quoteops.integration_trace import IntegrationTraceStore, seed_integration_traces
 from quoteops.operations_dashboard import OperationsDashboardService
+from quoteops.public_progress import PublicProgressFeed
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
-app = FastAPI(title="RalphiIA QuoteOps", version="0.5.0")
+app = FastAPI(title="RalphiIA QuoteOps", version="0.6.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
@@ -57,6 +59,12 @@ seed_integration_traces(
     _trace_store,
     settings,
     mongo_connected=_conversation.mongo_connected or _execution_service.db is not None,
+)
+_repo_root = Path(__file__).resolve().parents[1]
+_public_progress = PublicProgressFeed(
+    _repo_root / "docs" / "PUBLIC_PROGRESS.json",
+    trace_store=_trace_store,
+    repo_root=_repo_root,
 )
 
 
@@ -128,6 +136,14 @@ async def integrations_trace() -> JSONResponse:
             "items": _trace_store.snapshot(),
         }
     )
+
+
+@app.get("/api/public/progress", response_model=PublicProgressResponse)
+async def public_progress(response: Response, language: str = "es") -> PublicProgressResponse:
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return PublicProgressResponse.model_validate(_public_progress.snapshot(language))
 
 
 @app.post("/api/conversation/messages", response_model=ConversationReply)

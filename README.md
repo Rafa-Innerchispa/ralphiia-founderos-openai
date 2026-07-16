@@ -31,6 +31,12 @@ GPT-5.6 evidence for Build Week is captured by the Codex development sessions, c
 
 The side panel shows source, call, status, latency, observation time, and a sanitized result for each integration. Credentials and raw sensitive provider responses are not exposed.
 
+## Public build progress
+
+`GET /api/public/progress?language=es|en` exposes a small, read-only feed for the separately owned Astro website. It contains curated milestones, decisions, test evidence, the current commit, and integration name/status pairs. It never exposes mission text, customer identity, attachments, provider payloads, internal paths, IP addresses, credentials, latency, or trace results.
+
+The response includes a stable `revision` plus `refresh_seconds=15`, allowing a static site to poll for changes without rebuilding. Astro ownership and deployment remain outside this repository.
+
 ## Safety boundary
 
 - `QUOTEOPS_ALLOW_PRODUCTION_WRITES=0` by default.
@@ -64,6 +70,7 @@ QUOTEOPS_PORT=8765 .venv/bin/python main.py
 - `GET /health`
 - `GET /api/ui/bootstrap`
 - `GET /api/integrations/trace`
+- `GET /api/public/progress?language=es|en`
 - `POST /api/conversation/messages`
 - `GET /api/conversation/missions/{mission_id}`
 - `POST /api/conversation/missions/{mission_id}/attachments`

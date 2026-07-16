@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "refresh_seconds": 15,
+  "summary": {
+    "title_es": "QuoteOps se construye en abierto con evidencia verificable",
+    "title_en": "QuoteOps is being built in the open with verifiable evidence",
+    "status": "active",
+    "phase_es": "H2 completado · H3 es el siguiente hito",
+    "phase_en": "H2 completed · H3 is the next milestone",
+    "progress_percent": 29
+  },
+  "verification": {
+    "tests_passed": 45,
+    "tests_total": 45,
+    "staging_status": "healthy",
+    "commit": "97e06a3"
+  },
+  "decisions": [
+    {
+      "id": "decision-conversation-first",
+      "title_es": "La conversación es la entrada principal",
+      "title_en": "Conversation is the primary entry point",
+      "summary_es": "El expediente, los faltantes y la cotización avanzan desde lenguaje natural en lugar de un formulario técnico.",
+      "summary_en": "The case file, missing information, and quote progress from natural language instead of a technical form.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T02:19:33+00:00"
+    },
+    {
+      "id": "decision-runtime-truth",
+      "title_es": "El producto no inventa un runtime de IA",
+      "title_en": "The product does not invent an AI runtime",
+      "summary_es": "Sin una API autorizada, QuoteOps usa reglas deterministas y muestra Codex-built / MCP runtime.",
+      "summary_en": "Without an authorized API, QuoteOps uses deterministic rules and displays Codex-built / MCP runtime.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T02:19:33+00:00"
+    },
+    {
+      "id": "decision-human-approval",
+      "title_es": "Los valores y la entrega requieren control humano",
+      "title_en": "Pricing and delivery require human control",
+      "summary_es": "Los precios empiezan en cero; la aprobación humana precede al PDF y la entrega queda registrada de forma aislada.",
+      "summary_en": "Prices start at zero; human approval precedes the PDF and delivery is registered in isolation.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T02:19:33+00:00"
+    },
+    {
+      "id": "decision-public-feed-boundary",
+      "title_es": "El avance público usa una proyección mínima",
+      "title_en": "Public progress uses a minimal projection",
+      "summary_es": "Solo se publican hitos, decisiones, pruebas y estados resumidos; los datos operativos privados nunca forman parte del feed.",
+      "summary_en": "Only milestones, decisions, tests, and summarized statuses are published; private operational data never enters the feed.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T02:25:19+00:00"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-public-progress-contract",
+      "type": "release",
+      "title_es": "Feed público bilingüe verificado",
+      "title_en": "Bilingual public progress feed verified",
+      "summary_es": "El contrato de solo lectura publica evidencia curada con revisión estable y redacción defensiva para que Astro se actualice sin recompilar.",
+      "summary_en": "The read-only contract publishes curated evidence with stable revisions and defensive redaction so Astro can update without rebuilding.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T02:32:06+00:00",
+      "evidence": {
+        "tests": "45/45"
+      }
+    },
+    {
+      "id": "event-conversation-p0",
+      "type": "commit",
+      "title_es": "Experiencia conversacional P0 entregada",
+      "title_en": "Conversation-first P0 delivered",
+      "summary_es": "Chat bilingüe, expediente progresivo, identidad reconciliada, cotización editable, aprobación, PDF y entrega registrada quedaron integrados.",
+      "summary_en": "Bilingual chat, progressive case file, reconciled identity, editable quote, approval, PDF, and registered delivery were integrated.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T02:19:33+00:00",
+      "evidence": {
+        "commit": "97e06a3",
+        "tests": "42/42"
+      }
+    },
+    {
+      "id": "event-reconciliation-pilot",
+      "type": "commit",
+      "title_es": "Conciliación explicable añadida",
+      "title_en": "Explainable reconciliation added",
+      "summary_es": "El piloto de conciliación conserva evidencia y no promueve coincidencias sin revisión.",
+      "summary_en": "The reconciliation pilot preserves evidence and does not promote matches without review.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T00:22:50+00:00",
+      "evidence": {
+        "commit": "9369ac8"
+      }
+    },
+    {
+      "id": "event-iess-evidence",
+      "type": "commit",
+      "title_es": "Flujo de evidencia de pagos auditado",
+      "title_en": "Payment evidence workflow audited",
+      "summary_es": "La ingesta desde mensajería quedó protegida por vista previa, confirmación e idempotencia.",
+      "summary_en": "Messaging ingestion is protected by preview, confirmation, and idempotency.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T00:15:32+00:00",
+      "evidence": {
+        "commit": "901b843"
+      }
+    },
+    {
+      "id": "event-smart-quoter-boundary",
+      "type": "commit",
+      "title_es": "Smart Quoter integrado con límite de escritura",
+      "title_en": "Smart Quoter integrated behind a write boundary",
+      "summary_es": "QuoteOps reutiliza diagnóstico y refinamiento sin permitir escrituras heredadas fuera de la aprobación.",
+      "summary_en": "QuoteOps reuses diagnosis and refinement without allowing legacy writes outside approval.",
+      "status": "completed",
+      "occurred_at": "2026-07-15T12:17:27+00:00",
+      "evidence": {
+        "commit": "0e234c2"
+      }
+    },
+    {
+      "id": "event-h1-scaffold",
+      "type": "milestone",
+      "title_es": "H1: repositorio y API mínima",
+      "title_en": "H1: repository and minimum API",
+      "summary_es": "El repositorio independiente, la documentación base y el endpoint de salud quedaron verificados en el host de staging.",
+      "summary_en": "The independent repository, baseline documentation, and health endpoint were verified on the staging host.",
+      "status": "completed",
+      "occurred_at": "2026-07-14T19:12:16+00:00",
+      "evidence": {
+        "commit": "676addf"
+      }
+    }
+  ]
+}
