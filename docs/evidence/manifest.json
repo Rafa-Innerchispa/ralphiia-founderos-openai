@@ -1,0 +1,507 @@
+{
+  "codex_session_references": {
+    "gpt_5_6_evidence": "record through approved session references, commits, documentation, and demo video",
+    "kind": "derived",
+    "policy": "references only; no transcript, participant, client, or provider payload exported",
+    "source": "docs/CODEX_SESSION.md"
+  },
+  "commits": [
+    {
+      "commit": "7a01150",
+      "date": "2026-07-14",
+      "files": [
+        "docs/REUSE_MAP.md"
+      ],
+      "kind": "measured",
+      "subject": "Document QuoteOps reuse map"
+    },
+    {
+      "commit": "fa52d27",
+      "date": "2026-07-14",
+      "files": [
+        "README.md",
+        "docs/H2.md",
+        "quoteops/adapters/__init__.py",
+        "quoteops/adapters/openai_analysis.py",
+        "quoteops/adapters/ralfia_bridge.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/reuse_catalog.py",
+        "quoteops/settings.py",
+        "tests/__init__.py",
+        "tests/test_intake_analysis.py",
+        "tests/test_reuse_catalog.py"
+      ],
+      "kind": "measured",
+      "subject": "Add QuoteOps H1-H2 scaffold and reuse analysis"
+    },
+    {
+      "commit": "353bc17",
+      "date": "2026-07-14",
+      "files": [
+        "README.md",
+        "quoteops/adapters/ralfia_bridge.py",
+        "quoteops/app.py",
+        "quoteops/frontend.py"
+      ],
+      "kind": "measured",
+      "subject": "Add QuoteOps cockpit frontend and stack verification"
+    },
+    {
+      "commit": "2e5acb6",
+      "date": "2026-07-14",
+      "files": [
+        "README.md",
+        "quoteops/adapters/tool_planner.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "tests/test_tool_planner.py"
+      ],
+      "kind": "measured",
+      "subject": "Add H3 tool planning and approval routing"
+    },
+    {
+      "commit": "df8d01a",
+      "date": "2026-07-15",
+      "files": [
+        ".env.example",
+        ".gitignore",
+        "README.md",
+        "docs/BASELINE_PRE_HACKATHON.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/RUC_ARCHITECTURE.md",
+        "docs/RUC_LIVE_EVIDENCE.md",
+        "quoteops/adapters/customer_identity.py",
+        "quoteops/adapters/taxpayer_registry.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/customer_identity.py",
+        "quoteops/frontend.py",
+        "quoteops/settings.py",
+        "tests/test_taxpayer_registry.py"
+      ],
+      "kind": "measured",
+      "subject": "Add live Intuito RUC identity verification"
+    },
+    {
+      "commit": "a92eec2",
+      "date": "2026-07-15",
+      "files": [
+        ".env.example",
+        "quoteops/adapters/quote_execution.py",
+        "quoteops/app.py",
+        "quoteops/settings.py",
+        "tests/test_quote_execution.py"
+      ],
+      "kind": "measured",
+      "subject": "Add approval PDF and sandbox delivery flow"
+    },
+    {
+      "commit": "9f37da7",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/channel_intake.py",
+        "quoteops/app.py"
+      ],
+      "kind": "measured",
+      "subject": "Unify channel intake and webhook deduplication"
+    },
+    {
+      "commit": "dee6d2e",
+      "date": "2026-07-15",
+      "files": [
+        "tests/test_channel_intake.py"
+      ],
+      "kind": "measured",
+      "subject": "Test unified WhatsApp and Telegram intake"
+    },
+    {
+      "commit": "2797a35",
+      "date": "2026-07-15",
+      "files": [
+        ".env.example",
+        "quoteops/app.py",
+        "quoteops/settings.py"
+      ],
+      "kind": "measured",
+      "subject": "Add signed MCP intake bridge"
+    },
+    {
+      "commit": "b5223c6",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/channel_intake.py"
+      ],
+      "kind": "measured",
+      "subject": "Require signatures for MCP intake"
+    },
+    {
+      "commit": "9aa9460",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/contracts.py",
+        "quoteops/frontend.py"
+      ],
+      "kind": "measured",
+      "subject": "Add strict field validation across API and cockpit"
+    },
+    {
+      "commit": "2646d4a",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/customer_identity.py",
+        "quoteops/contracts.py",
+        "quoteops/customer_identity.py",
+        "quoteops/frontend.py"
+      ],
+      "kind": "measured",
+      "subject": "Validate and capture customer billing identity fields"
+    },
+    {
+      "commit": "8d76b09",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/contracts.py"
+      ],
+      "kind": "measured",
+      "subject": "Enforce billing fields through confirmation boundary"
+    },
+    {
+      "commit": "f186ca0",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/customer_identity.py"
+      ],
+      "kind": "measured",
+      "subject": "Persist validated billing fields through async store"
+    },
+    {
+      "commit": "0ba1753",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/customer_identity.py",
+        "quoteops/contracts.py"
+      ],
+      "kind": "measured",
+      "subject": "Gate canonical client upsert behind production flag"
+    },
+    {
+      "commit": "56f6873",
+      "date": "2026-07-15",
+      "files": [
+        "docs/REMOTE_DIRECT_ACCESS.md"
+      ],
+      "kind": "measured",
+      "subject": "Document direct mobile Linux access"
+    },
+    {
+      "commit": "0e234c2",
+      "date": "2026-07-15",
+      "files": [
+        "docs/E2E_STATUS.md",
+        "docs/SMART_QUOTER_INTEGRATION.md",
+        "quoteops/adapters/quote_execution.py",
+        "quoteops/adapters/smart_quoter.py",
+        "quoteops/app.py",
+        "quoteops/frontend.py",
+        "quoteops/settings.py",
+        "work_infrastructure_snapshot.py"
+      ],
+      "kind": "measured",
+      "subject": "Integrate Smart Quoter and persist QuoteOps approvals"
+    },
+    {
+      "commit": "4b3246c",
+      "date": "2026-07-15",
+      "files": [
+        "docs/DEMO_SCRIPT.md",
+        "docs/README_ADDENDUM.md"
+      ],
+      "kind": "measured",
+      "subject": "Add reproducible sandbox demo documentation"
+    },
+    {
+      "commit": "18ce0cf",
+      "date": "2026-07-15",
+      "files": [
+        "quoteops/adapters/telegram_delivery.py",
+        "tests/test_telegram_delivery.py"
+      ],
+      "kind": "measured",
+      "subject": "Add safe Telegram delivery adapter"
+    },
+    {
+      "commit": "901b843",
+      "date": "2026-07-16",
+      "files": [
+        "quoteops/app.py",
+        "quoteops/iess_payments.py",
+        "quoteops/settings.py",
+        "requirements-dev.txt",
+        "requirements.txt",
+        "scripts/reconcile_iess_bulk_error.py",
+        "tests/test_iess_payment_security.py",
+        "tests/test_iess_payments.py"
+      ],
+      "kind": "measured",
+      "subject": "Add audited IESS WhatsApp payment flow"
+    },
+    {
+      "commit": "9369ac8",
+      "date": "2026-07-16",
+      "files": [
+        "quoteops/reconciliation_pipeline.py",
+        "requirements.txt",
+        "scripts/run_reconciliation_pilot.py",
+        "tests/test_reconciliation_pipeline.py"
+      ],
+      "kind": "measured",
+      "subject": "Add explainable Pacifico reconciliation pilot"
+    },
+    {
+      "commit": "efa08e5",
+      "date": "2026-07-16",
+      "files": [
+        ".gitignore",
+        "README.md",
+        "quoteops/app.py",
+        "quoteops/frontend.py",
+        "quoteops/operations_dashboard.py",
+        "tests/test_operations_dashboard.py"
+      ],
+      "kind": "measured",
+      "subject": "Add real operations cockpit"
+    },
+    {
+      "commit": "97e06a3",
+      "date": "2026-07-16",
+      "files": [
+        ".env.example",
+        "README.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/SMART_QUOTER_INTEGRATION.md",
+        "quoteops/adapters/openai_analysis.py",
+        "quoteops/adapters/quote_execution.py",
+        "quoteops/adapters/ralfia_bridge.py",
+        "quoteops/adapters/taxpayer_registry.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/conversation.py",
+        "quoteops/frontend.py",
+        "quoteops/integration_trace.py",
+        "requirements.txt",
+        "tests/test_conversation.py",
+        "tests/test_conversation_api.py",
+        "tests/test_intake_analysis.py",
+        "tests/test_quote_execution.py",
+        "tests/test_taxpayer_registry.py"
+      ],
+      "kind": "measured",
+      "subject": "Build conversation-first QuoteOps experience"
+    },
+    {
+      "commit": "05a5802",
+      "date": "2026-07-16",
+      "files": [
+        "README.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/H2.md",
+        "docs/PUBLIC_PROGRESS.json",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/public_progress.py",
+        "tests/test_public_progress.py"
+      ],
+      "kind": "measured",
+      "subject": "Expose sanitized live progress feed"
+    },
+    {
+      "commit": "f0abb2e",
+      "date": "2026-07-16",
+      "files": [
+        ".env.example",
+        "README.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/DEMO_SCRIPT.md",
+        "docs/MCP_CHATGPT_RUNBOOK.md",
+        "quoteops/adapters/quote_execution.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/conversation.py",
+        "quoteops/frontend.py",
+        "quoteops/mcp_contract.py",
+        "quoteops/settings.py",
+        "tests/test_femar_supplier_flow.py",
+        "tests/test_mcp_contract.py"
+      ],
+      "kind": "measured",
+      "subject": "Complete FEMAR multimodal quote flow"
+    },
+    {
+      "commit": "40e853d",
+      "date": "2026-07-16",
+      "files": [
+        "docs/PUBLIC_PROGRESS.json"
+      ],
+      "kind": "measured",
+      "subject": "Publish FEMAR multimodal milestone"
+    },
+    {
+      "commit": "88c5993",
+      "date": "2026-07-16",
+      "files": [
+        "quoteops/contracts.py",
+        "tests/test_femar_supplier_flow.py"
+      ],
+      "kind": "measured",
+      "subject": "Preserve unknown supplier tax state"
+    },
+    {
+      "commit": "a265c05",
+      "date": "2026-07-16",
+      "files": [
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/PUBLIC_PROGRESS.json"
+      ],
+      "kind": "measured",
+      "subject": "Record verified supplier catalog ingestion"
+    },
+    {
+      "commit": "1010585",
+      "date": "2026-07-16",
+      "files": [
+        "README.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/MCP_CHATGPT_RUNBOOK.md",
+        "docs/PUBLIC_PROGRESS.json",
+        "quoteops/adapters/channel_intake.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/conversation.py",
+        "quoteops/frontend.py",
+        "quoteops/mcp_contract.py",
+        "tests/test_conversation.py",
+        "tests/test_conversation_api.py",
+        "tests/test_decision_workspace.py",
+        "tests/test_mcp_contract.py"
+      ],
+      "kind": "measured",
+      "subject": "Add sourced multichannel decision workspace"
+    },
+    {
+      "commit": "2b4613f",
+      "date": "2026-07-16",
+      "files": [
+        "docs/PUBLIC_PROGRESS.json"
+      ],
+      "kind": "measured",
+      "subject": "Publish verified decision workspace"
+    },
+    {
+      "commit": "b1d8d57",
+      "date": "2026-07-16",
+      "files": [
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "quoteops/contracts.py",
+        "quoteops/conversation.py",
+        "quoteops/frontend.py",
+        "tests/test_conversation.py"
+      ],
+      "kind": "measured",
+      "subject": "Generalize QuoteOps for photography workshops"
+    },
+    {
+      "commit": "6389879",
+      "date": "2026-07-16",
+      "files": [
+        "quoteops/conversation.py",
+        "tests/test_conversation.py"
+      ],
+      "kind": "measured",
+      "subject": "Translate known quote lines across languages"
+    },
+    {
+      "commit": "a6f08bb",
+      "date": "2026-07-16",
+      "files": [
+        "docs/CODEX_SESSION.md",
+        "docs/PUBLIC_PROGRESS.json"
+      ],
+      "kind": "measured",
+      "subject": "Publish multi-business verification milestone"
+    },
+    {
+      "commit": "16e1aaf",
+      "date": "2026-07-16",
+      "files": [
+        "docs/CODEX_SESSION.md"
+      ],
+      "kind": "measured",
+      "subject": "Clarify photography increment references"
+    }
+  ],
+  "export_checklist": {
+    "items": [
+      "sanitized commit log and this manifest",
+      "test command output with timestamps",
+      "sanitized staging health and OpenAPI captures",
+      "sanitized screenshots and demo video",
+      "approved Codex Session IDs (references only)"
+    ],
+    "kind": "pending"
+  },
+  "generated_from": {
+    "canonical_base": "16e1aaf",
+    "kind": "measured"
+  },
+  "observable_tests": {
+    "kind": "derived",
+    "source": "docs/PUBLIC_PROGRESS.json",
+    "source_commit": "6389879",
+    "staging_status": "healthy",
+    "tests_passed": 57,
+    "tests_total": 57
+  },
+  "openapi": {
+    "kind": "derived",
+    "live_export": {
+      "kind": "pending",
+      "reason": "capture a sanitized staging /openapi.json separately"
+    },
+    "source": "docs/CODEX_SESSION.md (verification note)",
+    "version": "0.8.0"
+  },
+  "runtime": {
+    "application_label": "deterministic_rules / Codex-built / MCP runtime",
+    "gpt_5_6": "build evidence only; not asserted as application runtime",
+    "kind": "derived",
+    "usage_or_token_metrics": {
+      "kind": "pending",
+      "reason": "not collected or inferred"
+    }
+  },
+  "schema_version": 1,
+  "scope": {
+    "environment": "staging evidence only",
+    "kind": "derived",
+    "name": "QuoteOps Build Week",
+    "production_writes": "not performed",
+    "smart_quoter": "read-only; not restarted"
+  },
+  "staging_health": {
+    "kind": "derived",
+    "live_probe": {
+      "kind": "pending",
+      "reason": "not performed by this offline generator"
+    },
+    "source": "docs/PUBLIC_PROGRESS.json verification.staging_status",
+    "value": "healthy"
+  }
+}
