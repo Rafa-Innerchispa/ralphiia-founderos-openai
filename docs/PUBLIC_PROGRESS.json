@@ -5,17 +5,26 @@
     "title_es": "QuoteOps se construye en abierto con evidencia verificable",
     "title_en": "QuoteOps is being built in the open with verifiable evidence",
     "status": "active",
-    "phase_es": "H2 completado · H3 es el siguiente hito",
-    "phase_en": "H2 completed · H3 is the next milestone",
-    "progress_percent": 29
+    "phase_es": "H3 multimodal verificado · H4 es el siguiente hito",
+    "phase_en": "H3 multimodal verified · H4 is the next milestone",
+    "progress_percent": 43
   },
   "verification": {
-    "tests_passed": 45,
-    "tests_total": 45,
+    "tests_passed": 50,
+    "tests_total": 50,
     "staging_status": "healthy",
-    "commit": "97e06a3"
+    "commit": "f0abb2e"
   },
   "decisions": [
+    {
+      "id": "decision-multimodal-evidence",
+      "title_es": "La evidencia multimodal permanece verificable",
+      "title_en": "Multimodal evidence remains verifiable",
+      "summary_es": "Las extracciones de imágenes y documentos conservan fuente, confianza y revisión humana; los artículos nuevos se aíslan hasta su aprobación.",
+      "summary_en": "Image and document extractions retain source, confidence, and human review; new items remain isolated until approved.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T03:46:30+00:00"
+    },
     {
       "id": "decision-conversation-first",
       "title_es": "La conversación es la entrada principal",
@@ -54,6 +63,20 @@
     }
   ],
   "events": [
+    {
+      "id": "event-femar-multimodal-flow",
+      "type": "commit",
+      "title_es": "Flujo multimodal FEMAR verificado",
+      "title_en": "FEMAR multimodal flow verified",
+      "summary_es": "ChatGPT puede registrar evidencia estructurada por MCP, conciliar el catálogo sin duplicados y avanzar paquetes, cotización, aprobación, PDF y entrega con control humano.",
+      "summary_en": "ChatGPT can record structured evidence through MCP, reconcile the catalog without duplicates, and advance packages, quoting, approval, PDF, and delivery with human control.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T03:46:30+00:00",
+      "evidence": {
+        "commit": "f0abb2e",
+        "tests": "50/50"
+      }
+    },
     {
       "id": "event-public-progress-contract",
       "type": "release",
