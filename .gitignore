@@ -13,3 +13,6 @@ venv/
 dist/
 build/
 coverage/
+
+# Real financial documents are local evidence, never repository content.
+data/

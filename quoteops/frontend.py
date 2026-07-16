@@ -98,8 +98,14 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     .signal strong { font-size: 15px; }
     .signal span { color: var(--muted); font-size: 12px; }
     .verified { color: var(--accent-2); }
+    .money { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 750; }
+    .operational-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+    .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+    .metric { padding: 13px; border-radius: 16px; background: rgba(3, 8, 16, .52); border: 1px solid var(--line); }
+    .metric strong { display: block; font-size: 21px; margin-top: 5px; }
     .accent-line { width: 66px; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); margin: 18px 0; }
-    @media (max-width: 1180px) { .hero, .grid, .grid2, .ruc-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1180px) { .hero, .grid, .grid2, .ruc-grid, .operational-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) { .metric-strip, .row { grid-template-columns: 1fr 1fr; } .wrap { padding: 14px; } }
   </style>
 </head>
 <body>
@@ -189,6 +195,23 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
         <div class="chips" id="rucChips"><span class="chip">waiting for verification</span></div>
         <div class="list" id="rucSignals" style="margin-top:14px;"></div>
         <div class="card" style="margin-top:14px;"><pre id="rucJson">Introduce un RUC para iniciar.</pre></div>
+      </div>
+    </section>
+
+    <section class="operational-grid" id="operationsPanel">
+      <div class="panel">
+        <span class="eyebrow">Pagos · Evidencia real</span>
+        <h2 style="margin-top:16px;">IESS Control Room</h2>
+        <p class="sub">Planillas, comprobantes y confirmaciones recibidas por WhatsApp. Los históricos no verificados nunca se muestran como deuda.</p>
+        <div class="metric-strip" id="iessMetrics"></div>
+        <div class="list" id="iessList"><div class="card small">Cargando operaciones IESS...</div></div>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">Banco del Pacífico · Staging</span>
+        <h2 style="margin-top:16px;">Reconciliation Radar</h2>
+        <p class="sub">Movimientos OCR, candidatos explicables y excepciones. La aprobación humana sigue siendo obligatoria.</p>
+        <div class="metric-strip" id="bankMetrics"></div>
+        <div class="list" id="bankList"><div class="card small">Cargando conciliación bancaria...</div></div>
       </div>
     </section>
 
@@ -478,6 +501,51 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       document.getElementById('stackStatus').textContent = verify.ok ? 'OK' : 'Check';
     }
 
+    function metric(label, value) {
+      return `<div class="metric"><span class="small">${label}</span><strong>${value}</strong></div>`;
+    }
+
+    function safeText(value, fallback = 'N/D') {
+      return value === undefined || value === null || value === '' ? fallback : String(value);
+    }
+
+    function escapeHtml(value, fallback = 'N/D') {
+      const element = document.createElement('span');
+      element.textContent = safeText(value, fallback);
+      return element.innerHTML;
+    }
+
+    async function refreshOperations() {
+      try {
+        const data = await fetchJson('/api/operations/summary');
+        const iess = data.iess;
+        const bank = data.bank;
+        document.getElementById('iessMetrics').innerHTML = [
+          metric('Planillas', iess.total_vouchers), metric('Verificadas', iess.paid_verified),
+          metric('Históricas', iess.paid_unverified), metric('Por confirmar', iess.awaiting_confirmation),
+        ].join('');
+        const payment = iess.latest_payment || {};
+        const voucherRows = (iess.recent_vouchers || []).slice(0, 5).map((item) =>
+          `<div class="card"><h3>${escapeHtml(item.periodo, 'Periodo pendiente')} · ${escapeHtml(item.status)}</h3><div class="small">Planilla ${escapeHtml(item.comprobante_id)} · USD ${Number(item.total_planilla || item.amount_paid || 0).toFixed(2)}</div></div>`
+        ).join('');
+        document.getElementById('iessList').innerHTML =
+          `<div class="card"><div class="badge">Último pago WhatsApp</div><div class="money">USD ${Number(payment.amount || 0).toFixed(2)}</div><div class="small">${escapeHtml(payment.payment_id, 'Sin pago confirmado')} · referencia ${escapeHtml(payment.reference)}</div></div>${voucherRows}`;
+        document.getElementById('bankMetrics').innerHTML = [
+          metric('Estados', bank.statement_count), metric('Movimientos', bank.transaction_count),
+          metric('Candidatos', bank.candidate_count), metric('Excepciones', bank.exception_count),
+        ].join('');
+        const statement = bank.latest_statement || {};
+        const candidates = (bank.recent_candidates || []).map((item) =>
+          `<div class="card"><h3>${escapeHtml(item.party_name)} · USD ${Number(item.amount || 0).toFixed(2)}</h3><div class="small">Score ${escapeHtml(item.score)} · ${escapeHtml((item.reasons || []).join(' · '))}</div><div class="chips" style="margin-top:8px;"><span class="chip">${escapeHtml(item.status)}</span><span class="chip">aprobación humana</span></div></div>`
+        ).join('');
+        document.getElementById('bankList').innerHTML =
+          `<div class="card"><div class="badge">Último estado</div><h3>${escapeHtml(statement.source_file)}</h3><div class="small">${escapeHtml(statement.statement_period_start)} a ${escapeHtml(statement.statement_period_end)} · diferencia USD ${Number(statement.balance_difference || 0).toFixed(2)} · ${escapeHtml(statement.continuity_status)}</div></div>${candidates || '<div class="card small">No hay candidatos pendientes.</div>'}`;
+      } catch (error) {
+        document.getElementById('iessList').innerHTML = '<div class="card small">Resumen operativo temporalmente no disponible.</div>';
+        document.getElementById('bankList').innerHTML = '<div class="card small">Resumen operativo temporalmente no disponible.</div>';
+      }
+    }
+
     async function analyze(endpoint) {
       const validationErrors = validateIntakeForm();
       if (validationErrors.length) { analysisHint.textContent = `Campos inválidos: ${validationErrors.join(', ')}`; return; }
@@ -511,6 +579,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
 
     renderTimeline('analysis');
     refreshReuse();
+    refreshOperations();
     fetchJson('/api/intake/preview', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

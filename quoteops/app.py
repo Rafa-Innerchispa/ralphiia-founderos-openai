@@ -27,6 +27,7 @@ from quoteops.contracts import (
 from quoteops.customer_identity import CustomerIdentityService
 from quoteops.frontend import render_cockpit_page
 from quoteops.iess_payments import IessPaymentService
+from quoteops.operations_dashboard import OperationsDashboardService
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
@@ -37,6 +38,7 @@ _execution_service = QuoteExecutionService(settings)
 _channel_router = ChannelIntakeRouter(settings.quoteops_webhook_secret)
 _smart_quoter = SmartQuoterAdapter(settings.smart_quoter_base_url)
 _iess_payments = IessPaymentService(settings)
+_operations_dashboard = OperationsDashboardService(settings.mongo_uri)
 
 
 @app.get("/")
@@ -81,6 +83,18 @@ async def meta() -> JSONResponse:
 @app.get("/api/ui/bootstrap")
 async def ui_bootstrap() -> JSONResponse:
     return JSONResponse(await build_bootstrap())
+
+
+@app.get("/api/operations/summary")
+async def operations_summary() -> JSONResponse:
+    """Expose a sanitized, read-only projection of staging operations."""
+    try:
+        return JSONResponse(_operations_dashboard.snapshot())
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "operations_summary_unavailable", "message": "No se pudo leer el resumen operativo."},
+        )
 
 
 @app.get("/api/reuse")
