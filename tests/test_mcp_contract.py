@@ -28,6 +28,9 @@ class TestQuoteOpsMcpContract(unittest.TestCase):
         self.assertIn("quoteops_add_supplier_offer", names)
         self.assertIn("quoteops_review_catalog_draft", names)
         self.assertIn("quoteops_select_package", names)
+        self.assertIn("quoteops_update_decision_brief", names)
+        self.assertIn("quoteops_upsert_configuration_alternative", names)
+        self.assertIn("quoteops_review_configuration_alternative", names)
         self.assertNotIn("shell", names)
         self.assertNotIn("mongo_query", names)
 

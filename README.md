@@ -10,9 +10,11 @@ QuoteOps turns a natural-language project conversation into a verified, editable
 4. Reconcile the identity read-only against RalphiIA and Contífico to avoid duplicates.
 5. Review site, confirmed scope, assumptions, risks, questions, and technical options.
 6. Let ChatGPT extract structured, reviewable evidence from images, PDFs, product labels, and supplier price lists through MCP.
-7. Compare three packages: selective rehabilitation, hybrid modernization, and full renewal.
-8. Prepare an editable quote whose selling prices start at zero while verified supplier costs remain internal.
-9. Enter real commercial values, obtain human approval, generate a real PDF, and register delivery.
+7. Build alternatives A/B/C in a shared decision workspace using confirmed requirements, sourced products, and reviewed compatibility evidence.
+8. Continue or edit the same mission through web, ChatGPT MCP, WhatsApp, Telegram, or the typed API.
+9. Require human review of a technical alternative before it can become an editable quote.
+10. Prepare an editable quote whose selling prices start at zero while verified supplier costs remain internal.
+11. Enter real commercial values, obtain human approval, generate a real PDF, and register delivery.
 
 The first supported real case is FEMAR's access-control replacement or rehabilitation project. The interface works in Spanish and English on mobile and desktop, and its translation catalog can be extended with additional locales.
 
@@ -31,6 +33,7 @@ GPT-5.6 evidence for Build Week is captured by the Codex development sessions, c
 - MongoDB staging mission, identity, approval, and delivery records.
 - Local PDF artifact generation after human approval.
 - A staging MCP JSON-RPC surface with typed mission, multimodal evidence, supplier-cost, package, pricing, approval, and delivery tools.
+- A shared idempotent channel-event bridge plus typed decision-brief, configuration-alternative, and alternative-review tools.
 - Read-only exact SKU/name reconciliation before any staging catalog draft is created, plus explicit human approval for genuinely new items.
 
 The side panel shows source, call, status, latency, observation time, and a sanitized result for each integration. Credentials and raw sensitive provider responses are not exposed.
@@ -76,7 +79,11 @@ QUOTEOPS_PORT=8765 .venv/bin/python main.py
 - `GET /api/integrations/trace`
 - `GET /api/public/progress?language=es|en`
 - `POST /api/conversation/messages`
+- `POST /api/conversation/channel-events`
 - `GET /api/conversation/missions/{mission_id}`
+- `PUT /api/conversation/missions/{mission_id}/decision-brief`
+- `PUT /api/conversation/missions/{mission_id}/alternatives/{code}`
+- `POST /api/conversation/missions/{mission_id}/alternatives/{code}/review`
 - `POST /api/conversation/missions/{mission_id}/attachments`
 - `POST /api/conversation/missions/{mission_id}/evidence/extractions`
 - `POST /api/conversation/missions/{mission_id}/evidence/{evidence_id}/review`

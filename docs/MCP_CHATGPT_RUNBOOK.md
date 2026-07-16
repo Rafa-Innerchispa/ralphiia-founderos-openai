@@ -22,12 +22,30 @@ Public or shared-gateway activation requires a separate reviewed change with aut
 3. `quoteops_review_extracted_evidence` after Rafael reviews the extraction
 4. `quoteops_add_supplier_offer` with the confirmed supplier reference and exact costs
 5. `quoteops_review_catalog_draft` for each genuinely new product or service
-6. `quoteops_select_package` with `A`, `B`, or `C`
-7. `quoteops_update_quote` with human-entered selling prices
-8. `quoteops_approve_quote` with an explicit approver
-9. `quoteops_register_delivery` only after approval
+6. `quoteops_update_decision_brief` with confirmed requirements and unresolved questions
+7. `quoteops_upsert_configuration_alternative` for each evidence-backed option `A`, `B`, or `C`
+8. `quoteops_review_configuration_alternative` after a human resolves gaps and compatibility
+9. `quoteops_select_package` with an approved `A`, `B`, or `C`
+10. `quoteops_update_quote` with human-entered selling prices
+11. `quoteops_approve_quote` with an explicit approver
+12. `quoteops_register_delivery` only after approval
 
 Every mutation requires an idempotency key. Repeating the same key returns the original result.
+
+## Shared channel contract
+
+`POST /api/conversation/channel-events` accepts a normalized channel plus its native payload. A stable `event_id`, `update_id`, or `message_id` becomes a persisted idempotency key. If `mission_id` or `case_ref` is present, the event continues that case; otherwise the first valid message creates a mission and returns its ID. The WhatsApp and Telegram webhooks use the same bridge and signature boundary.
+
+Natural-language channel messages update conversation context. Structured requirement and alternative edits use the typed tools above with `source_channel` set to the actual origin. This keeps web, ChatGPT, and messaging edits in one auditable mission without granting any channel arbitrary database or shell access.
+
+## Configuration safeguards
+
+- Alternative lines accept an exact supplier `offer_line_id` or an unambiguous SKU, quantity, role, compatibility state, rationale, and evidence IDs.
+- Alternative inputs do not define `unit_cost`; extra cost fields are rejected by the contract.
+- QuoteOps copies costs only from stored supplier offers and recomputes line totals.
+- Marking compatibility `verified` requires confirmed evidence plus an approved staging or canonical catalog link.
+- A human must approve the complete alternative before it can create editable quote lines.
+- The selected assistant/model field is provenance supplied by the operator. It never changes the honest QuoteOps runtime label.
 
 ## Multimodal evidence
 

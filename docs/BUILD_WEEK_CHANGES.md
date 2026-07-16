@@ -52,3 +52,15 @@
 - Preserved unknown tax treatment as `null` because the supplier sources did not state whether tax was included.
 - Kept imported catalog prices outside FEMAR packages until a human selects the technical architecture; supplier cost never became selling price.
 - Verified 39 unique SKUs, 39 canonical links, zero duplicate staging SKUs, and zero production catalog writes.
+
+## Evidence-backed multichannel decisions
+
+- Added one shared decision workspace per mission for confirmed requirements, assumptions, validation needs, open questions, selected assistant metadata, and alternatives A/B/C.
+- Added a common idempotent channel-event contract so web, ChatGPT MCP, WhatsApp, Telegram, and typed API clients can start or continue the same mission. Channel event IDs are persisted through mission operation keys instead of relying only on process memory.
+- Added typed MCP and HTTP operations to update the decision brief, upsert a configuration alternative, and record explicit human approval or rejection.
+- Configuration callers can reference only supplier offer lines already stored in the mission. QuoteOps resolves SKU, description, supplier, canonical item, unit cost, and line cost from the source offer; caller-supplied cost fields are rejected.
+- Added compatibility safeguards: verified lines require confirmed evidence and an approved staging/canonical catalog link; unknown, ambiguous, duplicated, rejected, or unreviewed items are blocked with bilingual errors.
+- Added a technical review gate before package selection. Only an approved alternative can become an editable quote; its selling prices still start at zero and internal costs remain out of the customer PDF.
+- Added a bilingual responsive decision panel for requirements, questions, assistant selection metadata, sourced products, quantities, roles, compatibility, evidence, rationale, risks, gaps, and human review.
+- Kept runtime truth separate from assistant metadata. Selecting a decision assistant never changes or overstates the QuoteOps runtime label.
+- Locked approved or delivered quotes against later requirement, configuration, package, or price edits. Editing a pre-approval configuration invalidates the stale quote and requires a fresh technical review.

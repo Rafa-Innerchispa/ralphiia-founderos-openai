@@ -134,6 +134,16 @@ class TestConversationService(unittest.TestCase):
             artifact = execution.artifact_path(approved["approval"]["artifact_id"])
             self.assertTrue(artifact.read_bytes().startswith(b"%PDF-1.4"))
 
+            with self.assertRaisesRegex(ValueError, "approved_quote_locked"):
+                self.service.update_quote(
+                    initial.mission_id,
+                    QuoteUpdateRequest(
+                        idempotency_key="quote-flow-locked-update-0001",
+                        language="es",
+                        lines=priced.dossier.quote.lines,
+                    ),
+                )
+
             delivered = self.service.deliver(
                 initial.mission_id,
                 MissionDeliveryRequest(

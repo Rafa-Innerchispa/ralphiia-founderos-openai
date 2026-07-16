@@ -7,7 +7,10 @@ from pydantic import ValidationError
 
 from quoteops.contracts import (
     CatalogDraftReviewRequest,
+    ConfigurationAlternativeUpsertRequest,
+    ConfigurationReviewRequest,
     ConversationMessageRequest,
+    DecisionBriefUpdateRequest,
     EvidenceReviewRequest,
     MissionApprovalRequest,
     MissionDeliveryRequest,
@@ -105,6 +108,44 @@ MCP_TOOLS = [
         },
     },
     {
+        "name": "quoteops_update_decision_brief",
+        "description": (
+            "Add or edit confirmed requirements and open questions in the shared case. This does "
+            "not generate a proposal or assert product compatibility. Set source_channel to the "
+            "originating channel."
+        ),
+        "inputSchema": _with_mission_id(DecisionBriefUpdateRequest.model_json_schema()),
+    },
+    {
+        "name": "quoteops_upsert_configuration_alternative",
+        "description": (
+            "Create or edit technical alternative A, B, or C using only supplier offer line IDs or "
+            "SKUs already stored in the mission. QuoteOps resolves all costs from source evidence; "
+            "the caller cannot supply or invent costs."
+        ),
+        "inputSchema": _with_mission_id(ConfigurationAlternativeUpsertRequest.model_json_schema()),
+    },
+    {
+        "name": "quoteops_review_configuration_alternative",
+        "description": (
+            "Approve or reject one evidence-backed technical alternative after explicit human review."
+        ),
+        "inputSchema": {
+            **_with_mission_id(ConfigurationReviewRequest.model_json_schema()),
+            "properties": {
+                **_with_mission_id(ConfigurationReviewRequest.model_json_schema())["properties"],
+                "alternative_code": {"type": "string", "enum": ["A", "B", "C"]},
+            },
+            "required": [
+                "mission_id",
+                "alternative_code",
+                "idempotency_key",
+                "decision",
+                "reviewed_by",
+            ],
+        },
+    },
+    {
         "name": "quoteops_select_package",
         "description": (
             "Select package A, B, or C and create an editable quote. Supplier costs are retained as "
@@ -185,6 +226,25 @@ class QuoteOpsMcpContract:
                     mission_id,
                     catalog_draft_id,
                     CatalogDraftReviewRequest.model_validate(args),
+                )
+            if name == "quoteops_update_decision_brief":
+                return self.conversation.update_decision_brief(
+                    mission_id,
+                    DecisionBriefUpdateRequest.model_validate(args),
+                )
+            if name == "quoteops_upsert_configuration_alternative":
+                return self.conversation.upsert_configuration_alternative(
+                    mission_id,
+                    ConfigurationAlternativeUpsertRequest.model_validate(args),
+                )
+            if name == "quoteops_review_configuration_alternative":
+                alternative_code = str(args.pop("alternative_code", ""))
+                if alternative_code not in {"A", "B", "C"}:
+                    return {"ok": False, "error": "alternative_code_required"}
+                return self.conversation.review_configuration_alternative(
+                    mission_id,
+                    alternative_code,
+                    ConfigurationReviewRequest.model_validate(args),
                 )
             if name == "quoteops_select_package":
                 return self.conversation.select_package(

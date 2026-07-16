@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Any, Literal
 import re
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def validate_email_value(value: str, field_name: str = "email") -> str:
@@ -240,6 +240,7 @@ class RucConfirmationResult(BaseModel):
 
 
 LanguageCode = Literal["es", "en"]
+ChannelCode = Literal["web", "chatgpt_mcp", "whatsapp", "telegram", "api"]
 
 
 class ConversationAttachment(BaseModel):
@@ -260,14 +261,31 @@ class ConversationMessageRequest(BaseModel):
     mission_id: str = Field(default="", max_length=80, pattern=r"^(?:|mission_[a-f0-9]{18})$")
     idempotency_key: str = Field(min_length=8, max_length=120)
     language: LanguageCode = "es"
-    source_channel: Literal["web", "chatgpt_mcp", "whatsapp"] = "web"
+    source_channel: ChannelCode = "web"
+    channel_event_id: str = Field(default="", max_length=160)
+    sender_id: str = Field(default="", max_length=160)
+    customer_name: str = Field(default="", max_length=200)
     message: str = Field(default="", max_length=30_000)
     attachments: list[ConversationAttachment] = Field(default_factory=list, max_length=20)
 
-    @field_validator("mission_id", "idempotency_key", "message", mode="before")
+    @field_validator(
+        "mission_id",
+        "idempotency_key",
+        "message",
+        "channel_event_id",
+        "sender_id",
+        "customer_name",
+        mode="before",
+    )
     @classmethod
     def strip_conversation_text(cls, value):
         return str(value or "").strip()
+
+
+class ChannelEventEnvelope(BaseModel):
+    channel: ChannelCode
+    payload: dict[str, Any]
+    signature: str = Field(default="", max_length=256)
 
 
 class DossierCustomer(BaseModel):
@@ -288,7 +306,15 @@ class DossierOption(BaseModel):
     code: str
     title: str
     summary: str
-    status: Literal["needs_scope", "needs_costs", "needs_pricing", "ready"] = "needs_costs"
+    status: Literal[
+        "needs_scope",
+        "needs_costs",
+        "needs_validation",
+        "ready_for_review",
+        "needs_pricing",
+        "ready",
+        "approved",
+    ] = "needs_costs"
     line_ids: list[str] = Field(default_factory=list, max_length=100)
     supplier_cost_total: float = Field(default=0, ge=0)
     selling_total: float = Field(default=0, ge=0)
@@ -308,7 +334,7 @@ class MissionWorkItem(BaseModel):
         "completed",
     ] = "in_progress"
     next_action: str = ""
-    source_channel: Literal["web", "chatgpt_mcp", "whatsapp"] = "web"
+    source_channel: ChannelCode = "web"
 
 
 class MissionTimelineEvent(BaseModel):
@@ -322,6 +348,10 @@ class MissionTimelineEvent(BaseModel):
         "catalog_reviewed",
         "customer_verified",
         "supplier_offer_added",
+        "requirements_updated",
+        "alternative_updated",
+        "alternative_reviewed",
+        "channel_event_received",
         "package_selected",
         "quote_priced",
         "quote_approved",
@@ -557,6 +587,168 @@ class EditableQuote(BaseModel):
     supplier_cost_total: float = Field(default=0, ge=0)
 
 
+class TechnicalRequirementInput(BaseModel):
+    requirement_id: str = Field(
+        default="",
+        max_length=80,
+        pattern=r"^(?:|requirement_[a-f0-9]{18})$",
+    )
+    category: Literal[
+        "legacy",
+        "infrastructure",
+        "door",
+        "credential",
+        "software",
+        "commercial",
+        "other",
+    ] = "other"
+    text: str = Field(min_length=2, max_length=1000)
+    status: Literal["confirmed", "assumption", "needs_validation"] = "confirmed"
+    priority: Literal["must", "should", "could"] = "must"
+
+    @field_validator("requirement_id", "text", mode="before")
+    @classmethod
+    def strip_requirement_text(cls, value):
+        return str(value or "").strip()
+
+
+class TechnicalRequirement(TechnicalRequirementInput):
+    requirement_id: str = Field(pattern=r"^requirement_[a-f0-9]{18}$")
+    source_channel: ChannelCode = "web"
+    source_event_id: str = ""
+    updated_by: str = ""
+    updated_at: str
+
+
+class DecisionBriefUpdateRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    source_channel: ChannelCode = "web"
+    channel_event_id: str = Field(default="", max_length=160)
+    updated_by: str = Field(min_length=2, max_length=120)
+    requirements: list[TechnicalRequirementInput] = Field(default_factory=list, max_length=100)
+    remove_requirement_ids: list[str] = Field(default_factory=list, max_length=100)
+    open_questions: list[str] = Field(default_factory=list, max_length=100)
+    replace_requirements: bool = False
+    replace_open_questions: bool = False
+    selected_model: str = Field(default="", max_length=120)
+
+
+class ConfigurationLineInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    offer_line_id: str = Field(default="", max_length=120)
+    sku: str = Field(default="", max_length=120)
+    quantity: float = Field(default=1, gt=0, le=100_000)
+    role: str = Field(default="equipment", min_length=2, max_length=80)
+    compatibility_status: Literal["needs_validation", "verified", "incompatible"] = (
+        "needs_validation"
+    )
+    rationale: str = Field(default="", max_length=1000)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("offer_line_id", "sku", "role", "rationale", mode="before")
+    @classmethod
+    def strip_configuration_line_text(cls, value):
+        return str(value or "").strip()
+
+
+class ConfigurationLine(BaseModel):
+    line_id: str
+    source_offer_id: str
+    source_offer_line_id: str
+    supplier_name: str
+    canonical_item_id: str = ""
+    sku: str = ""
+    description: str
+    kind: Literal["equipment", "material", "service", "labor"]
+    unit: str
+    quantity: float
+    unit_cost: float = Field(ge=0)
+    line_cost: float = Field(ge=0)
+    role: str
+    compatibility_status: Literal["needs_validation", "verified", "incompatible"]
+    rationale: str = ""
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ConfigurationAlternativeUpsertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    source_channel: ChannelCode = "web"
+    channel_event_id: str = Field(default="", max_length=160)
+    code: Literal["A", "B", "C"]
+    title: str = Field(min_length=2, max_length=200)
+    objective: str = Field(default="", max_length=1000)
+    lines: list[ConfigurationLineInput] = Field(min_length=1, max_length=100)
+    coverage: list[str] = Field(default_factory=list, max_length=100)
+    gaps: list[str] = Field(default_factory=list, max_length=100)
+    assumptions: list[str] = Field(default_factory=list, max_length=100)
+    risks: list[str] = Field(default_factory=list, max_length=100)
+    generated_by: Literal[
+        "web",
+        "chatgpt_mcp",
+        "whatsapp",
+        "telegram",
+        "api",
+        "deterministic_rules",
+    ] = "web"
+    selected_model: str = Field(default="", max_length=120)
+    updated_by: str = Field(min_length=2, max_length=120)
+
+
+class ConfigurationAlternative(BaseModel):
+    code: Literal["A", "B", "C"]
+    title: str
+    objective: str = ""
+    status: Literal[
+        "draft",
+        "needs_validation",
+        "ready_for_review",
+        "approved",
+        "rejected",
+    ] = "draft"
+    lines: list[ConfigurationLine] = Field(default_factory=list)
+    supplier_cost_total: float = Field(default=0, ge=0)
+    coverage: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    generated_by: str = ""
+    selected_model: str = ""
+    updated_by: str = ""
+    reviewed_by: str = ""
+    review_notes: str = ""
+    updated_at: str
+    revision: int = Field(default=1, ge=1)
+
+
+class ConfigurationReviewRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    decision: Literal["approve", "reject"]
+    reviewed_by: str = Field(min_length=2, max_length=120)
+    notes: str = Field(default="", max_length=1000)
+
+
+class DecisionWorkspace(BaseModel):
+    status: Literal[
+        "collecting_requirements",
+        "drafting_alternatives",
+        "needs_validation",
+        "ready_for_review",
+        "approved",
+    ] = "collecting_requirements"
+    requirements: list[TechnicalRequirement] = Field(default_factory=list)
+    alternatives: list[ConfigurationAlternative] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    last_channel: ChannelCode = "web"
+    selected_model: str = ""
+    revision: int = Field(default=0, ge=0)
+
+
 class ContextDossier(BaseModel):
     customer: DossierCustomer = Field(default_factory=DossierCustomer)
     site: DossierSite = Field(default_factory=DossierSite)
@@ -568,6 +760,7 @@ class ContextDossier(BaseModel):
     supplier_offers: list[SupplierOffer] = Field(default_factory=list)
     catalog_drafts: list[CatalogDraftItem] = Field(default_factory=list)
     extracted_evidence: list[MultimodalEvidence] = Field(default_factory=list)
+    decision_workspace: DecisionWorkspace = Field(default_factory=DecisionWorkspace)
     attachments: list[ConversationAttachment] = Field(default_factory=list)
     work_item: MissionWorkItem | None = None
     timeline: list[MissionTimelineEvent] = Field(default_factory=list, max_length=200)
@@ -585,7 +778,7 @@ class ConversationReply(BaseModel):
     ok: bool = True
     mission_id: str
     language: LanguageCode
-    phase: Literal["discovery", "identity", "scope", "quote", "approval", "delivery"]
+    phase: Literal["discovery", "identity", "scope", "design", "quote", "approval", "delivery"]
     assistant_message: str
     dossier: ContextDossier
     history: list[ConversationTurn] = Field(default_factory=list)

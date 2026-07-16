@@ -23,9 +23,14 @@ from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize_ec_identifier
 from quoteops.contracts import (
     CatalogDraftReviewRequest,
+    ChannelEventEnvelope,
+    ConfigurationAlternativeUpsertRequest,
+    ConfigurationReviewRequest,
+    ConversationAttachment,
     ConversationMessageRequest,
     ConversationReply,
     CustomerIdentifierLookupRequest,
+    DecisionBriefUpdateRequest,
     EvidenceReviewRequest,
     MissionApprovalRequest,
     MissionDeliveryRequest,
@@ -53,7 +58,7 @@ from quoteops.public_progress import PublicProgressFeed
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
-app = FastAPI(title="RalphiIA QuoteOps", version="0.7.0")
+app = FastAPI(title="RalphiIA QuoteOps", version="0.8.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
@@ -179,6 +184,63 @@ async def conversation_mission(mission_id: str, language: str = "es") -> Convers
         return _conversation.get(mission_id, language if language in {"es", "en"} else "es")
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", language)) from exc
+
+
+@app.post("/api/conversation/channel-events")
+async def conversation_channel_event(request: ChannelEventEnvelope) -> JSONResponse:
+    result = _continue_channel_event(request.channel, request.payload, request.signature)
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
+
+
+@app.put("/api/conversation/missions/{mission_id}/decision-brief")
+async def conversation_decision_brief(
+    mission_id: str,
+    request: DecisionBriefUpdateRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.update_decision_brief(mission_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.put("/api/conversation/missions/{mission_id}/alternatives/{code}")
+async def conversation_configuration_alternative(
+    mission_id: str,
+    code: str,
+    request: ConfigurationAlternativeUpsertRequest,
+) -> JSONResponse:
+    if code not in {"A", "B", "C"} or request.code != code:
+        raise HTTPException(
+            status_code=422,
+            detail=_mission_error("configuration_code_mismatch", request.language),
+        )
+    try:
+        return JSONResponse(_conversation.upsert_configuration_alternative(mission_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/alternatives/{code}/review")
+async def conversation_configuration_review(
+    mission_id: str,
+    code: str,
+    request: ConfigurationReviewRequest,
+) -> JSONResponse:
+    if code not in {"A", "B", "C"}:
+        raise HTTPException(
+            status_code=422,
+            detail=_mission_error("configuration_code_mismatch", request.language),
+        )
+    try:
+        return JSONResponse(_conversation.review_configuration_alternative(mission_id, code, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
 
 
 @app.put("/api/conversation/missions/{mission_id}/quote", response_model=ConversationReply)
@@ -588,7 +650,8 @@ async def quote_deliver(request: dict) -> JSONResponse:
 async def channel_intake(request: dict) -> JSONResponse:
     channel = str(request.get("channel") or "web")
     payload = request.get("payload") or {}
-    return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
+    result = _continue_channel_event(channel, payload, str(request.get("signature") or ""))
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
 
 
 @app.post("/api/mcp/quoteops_intake")
@@ -596,7 +659,8 @@ async def mcp_quoteops_intake(request: dict) -> JSONResponse:
     """Typed bridge for an authorized MCP client; no arbitrary tool execution."""
     channel = str(request.get("channel") or "chatgpt_mcp")
     payload = request.get("payload") or {}
-    return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
+    result = _continue_channel_event(channel, payload, str(request.get("signature") or ""))
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
 
 
 @app.get("/api/mcp/tools")
@@ -631,7 +695,7 @@ async def quoteops_streamable_mcp(request: Request, payload: dict) -> Response:
                 "result": {
                     "protocolVersion": requested,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "ralphiia-quoteops-staging", "version": "0.7.0"},
+                    "serverInfo": {"name": "ralphiia-quoteops-staging", "version": "0.8.0"},
                     "instructions": (
                         "Create or continue a mission first. Never invent supplier costs or selling "
                         "prices, and require human approval before delivery."
@@ -665,13 +729,87 @@ async def quoteops_streamable_mcp(request: Request, payload: dict) -> Response:
 
 
 @app.post("/api/webhooks/whatsapp")
-async def whatsapp_webhook(request: dict) -> JSONResponse:
-    return JSONResponse(_channel_router.ingest("whatsapp", request, str(request.get("signature") or "")))
+async def whatsapp_webhook(http_request: Request, payload: dict) -> JSONResponse:
+    signature = http_request.headers.get("x-quoteops-signature", "") or str(
+        payload.get("signature") or ""
+    )
+    result = _continue_channel_event("whatsapp", payload, signature)
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
 
 
 @app.post("/api/webhooks/telegram")
-async def telegram_webhook(request: dict) -> JSONResponse:
-    return JSONResponse(_channel_router.ingest("telegram", request, str(request.get("signature") or "")))
+async def telegram_webhook(http_request: Request, payload: dict) -> JSONResponse:
+    signature = http_request.headers.get("x-quoteops-signature", "") or str(
+        payload.get("signature") or ""
+    )
+    result = _continue_channel_event("telegram", payload, signature)
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
+
+
+def _continue_channel_event(
+    channel: str,
+    payload: dict,
+    signature: str = "",
+) -> dict:
+    normalized = _channel_router.ingest(channel, payload, signature)
+    if not normalized.get("ok"):
+        return normalized
+    if channel not in {"web", "chatgpt_mcp", "whatsapp", "telegram", "api"}:
+        return {**normalized, "mission_updated": False}
+    intake = normalized.get("intake") or {}
+    raw_attachments = intake.get("attachments") or []
+    attachments: list[ConversationAttachment] = []
+    for index, item in enumerate(raw_attachments[:20]):
+        if isinstance(item, dict):
+            name = str(item.get("name") or item.get("filename") or f"channel-attachment-{index + 1}")
+            try:
+                size_bytes = int(item.get("size_bytes") or 0)
+            except (TypeError, ValueError):
+                size_bytes = 0
+            attachments.append(
+                ConversationAttachment(
+                    name=name[:240],
+                    media_type=str(item.get("media_type") or item.get("content_type") or "application/octet-stream")[:120],
+                    size_bytes=max(0, min(size_bytes, 25_000_000)),
+                    storage_id=str(item.get("storage_id") or "")[:120],
+                    sha256=str(item.get("sha256") or "")[:64],
+                    status="stored" if item.get("storage_id") and item.get("sha256") else "selected",
+                )
+            )
+        elif str(item or "").strip():
+            attachments.append(ConversationAttachment(name=str(item).strip()[:240]))
+    message = str(intake.get("original_text") or "").strip()
+    if not message and not attachments:
+        return {**normalized, "mission_updated": False}
+    event_id = str(normalized.get("event_id") or "")
+    operation_key = "channel-" + sha256(f"{channel}:{event_id}".encode()).hexdigest()[:40]
+    try:
+        result = _conversation.message(
+            ConversationMessageRequest(
+                mission_id=str(normalized.get("mission_id") or ""),
+                idempotency_key=operation_key,
+                language=str(normalized.get("language") or "es"),
+                source_channel=channel,
+                channel_event_id=event_id,
+                sender_id=str(intake.get("contact") or "")[:160],
+                customer_name=str(intake.get("customer_name") or "")[:200]
+                if any(payload.get(key) for key in ("customer_name", "name", "from_name"))
+                else "",
+                message=message,
+                attachments=attachments,
+            )
+        ).model_dump()
+    except (KeyError, ValueError) as exc:
+        return {**normalized, "ok": False, "status": "rejected", "reason": str(exc)}
+    return {
+        **result,
+        "channel_event": {
+            "channel": channel,
+            "event_id": event_id,
+            "deduplicated": normalized.get("deduplicated", False),
+        },
+        "mission_updated": True,
+    }
 
 
 def _require_mcp_auth(request: Request) -> None:
@@ -747,6 +885,21 @@ def _mission_error(code: str, language: str) -> dict[str, str]:
             "attachment_evidence_not_found": "La evidencia no coincide con un archivo almacenado en este expediente.",
             "evidence_not_found": "No se encontró la extracción solicitada.",
             "catalog_draft_not_found": "No se encontró el borrador de producto o servicio solicitado.",
+            "configuration_code_mismatch": "El código de la alternativa no coincide con la ruta solicitada.",
+            "configuration_item_reference_required": "Selecciona un producto de una oferta registrada.",
+            "configuration_item_not_found": "El producto no existe en las ofertas de este expediente.",
+            "configuration_item_ambiguous": "Ese SKU aparece en varias ofertas; selecciona la línea de oferta exacta.",
+            "configuration_item_reference_mismatch": "El SKU no coincide con la línea de oferta seleccionada.",
+            "configuration_item_duplicated": "Una alternativa no puede repetir la misma línea de oferta.",
+            "configuration_catalog_item_rejected": "El producto seleccionado fue rechazado en el catálogo de staging.",
+            "configuration_catalog_review_required": "Aprueba primero el producto en el catálogo aislado de staging.",
+            "configuration_evidence_required": "Selecciona evidencia confirmada para marcar compatibilidad como verificada.",
+            "configuration_evidence_not_found": "La evidencia seleccionada no pertenece a este expediente.",
+            "configuration_evidence_not_confirmed": "La evidencia debe estar confirmada por una persona.",
+            "configuration_alternative_not_found": "No se encontró la alternativa solicitada.",
+            "configuration_validation_required": "Resuelve brechas y valida cada producto antes de aprobar la alternativa.",
+            "configuration_review_required": "La alternativa técnica necesita revisión humana antes de cotizarse.",
+            "approved_quote_locked": "La cotización aprobada o entregada está bloqueada; inicia una nueva revisión para cambiarla.",
         },
         "en": {
             "message_or_attachment_required": "Write a message or attach at least one file.",
@@ -759,6 +912,21 @@ def _mission_error(code: str, language: str) -> dict[str, str]:
             "attachment_evidence_not_found": "The evidence does not match a file stored in this case.",
             "evidence_not_found": "The requested extraction was not found.",
             "catalog_draft_not_found": "The requested product or service draft was not found.",
+            "configuration_code_mismatch": "The alternative code does not match the requested route.",
+            "configuration_item_reference_required": "Select a product from a recorded supplier offer.",
+            "configuration_item_not_found": "The product does not exist in this case's supplier offers.",
+            "configuration_item_ambiguous": "That SKU appears in multiple offers; select the exact offer line.",
+            "configuration_item_reference_mismatch": "The SKU does not match the selected offer line.",
+            "configuration_item_duplicated": "An alternative cannot repeat the same supplier offer line.",
+            "configuration_catalog_item_rejected": "The selected product was rejected in the staging catalog.",
+            "configuration_catalog_review_required": "Approve the product in the isolated staging catalog first.",
+            "configuration_evidence_required": "Select confirmed evidence before marking compatibility as verified.",
+            "configuration_evidence_not_found": "The selected evidence does not belong to this case.",
+            "configuration_evidence_not_confirmed": "The evidence must be confirmed by a human.",
+            "configuration_alternative_not_found": "The requested alternative was not found.",
+            "configuration_validation_required": "Resolve gaps and validate every product before approval.",
+            "configuration_review_required": "The technical alternative needs human review before quoting.",
+            "approved_quote_locked": "The approved or delivered quote is locked; start a new review to change it.",
         },
     }
     locale = language if language in messages else "es"

@@ -126,6 +126,23 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     .option span { color: var(--muted); font-size: 11px; line-height: 1.35; }
     .option-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
     .option-meta button { border: 1px solid var(--line); border-radius: 999px; background: var(--ink); color: white; padding: 6px 9px; cursor: pointer; font: inherit; font-size: 10px; }
+    .decision-intro { padding: 13px; border-radius: 16px; background: linear-gradient(135deg, var(--teal-soft), #fff8e8); border: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .decision-card { margin-top: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 17px; background: white; }
+    .decision-card h3 { margin: 0 0 9px; font-size: 13px; }
+    .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .decision-field { display: grid; gap: 4px; margin-top: 7px; color: var(--muted); font-size: 10px; font-weight: 800; }
+    .decision-field.full { grid-column: 1 / -1; }
+    .decision-field input, .decision-field select, .decision-field textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 11px; resize: vertical; }
+    .requirement-row, .alternative-line { display: grid; gap: 6px; padding: 9px; margin-top: 7px; border-radius: 12px; background: var(--paper); }
+    .requirement-row { grid-template-columns: 92px 78px 85px 1fr auto; }
+    .alternative-line { grid-template-columns: minmax(150px, 1fr) 58px 100px 110px; }
+    .requirement-row input, .requirement-row select, .alternative-line input, .alternative-line select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font: inherit; font-size: 10px; }
+    .alternative-line .wide { grid-column: span 2; }
+    .row-remove { width: 30px; border: 0; border-radius: 9px; background: #ffe9e5; color: var(--danger); cursor: pointer; font-weight: 900; }
+    .decision-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+    .decision-actions button { font-size: 10px; }
+    .decision-note { margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .cost-proof { display: flex; justify-content: space-between; gap: 8px; padding-top: 9px; margin-top: 9px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 900; }
     .quote-line { display: grid; grid-template-columns: 1fr 66px 100px; gap: 6px; margin: 7px 0; }
     .quote-line input { padding: 8px; font-size: 11px; }
     .quote-source { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
@@ -171,6 +188,8 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       .send { grid-column: 1 / -1; width: 100%; }
       .compose-note span:last-child { display: none; }
       .quote-line { grid-template-columns: 1fr 58px 85px; }
+      .requirement-row, .alternative-line { grid-template-columns: 1fr; }
+      .alternative-line .wide { grid-column: auto; }
     }
   </style>
 </head>
@@ -216,7 +235,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       </section>
 
       <aside class="side-shell">
-        <div class="tabs"><button class="active" data-tab="dossier" data-i18n="caseFile">Expediente</button><button data-tab="traces" data-i18n="connections">Conexiones</button></div>
+        <div class="tabs"><button class="active" data-tab="dossier" data-i18n="caseFile">Expediente</button><button data-tab="decision" data-i18n="decision">Decisión</button><button data-tab="traces" data-i18n="connections">Conexiones</button></div>
         <div class="side-content">
           <div class="tab-panel" id="dossierPanel">
             <div class="progress-block"><div class="progress-row"><strong data-i18n="projectProgress">Progreso del proyecto</strong><span id="progressValue">10%</span></div><div class="bar"><i id="progressBar"></i></div></div>
@@ -229,6 +248,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
             <div id="dossierSections"></div>
             <div id="quoteEditor"></div>
           </div>
+          <div class="tab-panel" id="decisionPanel" hidden><div id="decisionWorkspace"></div></div>
           <div class="tab-panel" id="tracesPanel" hidden>
             <div class="trace-note" data-i18n="traceNote">Cada tarjeta muestra la fuente real, la llamada observada y un resultado saneado. Las credenciales y datos sensibles nunca aparecen aquí.</div>
             <div id="traceList"></div>
@@ -252,12 +272,46 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     Object.assign(I18N.es, {
       catalogDrafts:'Productos o servicios por aprobar', status_draft:'Borrador pendiente',
       status_approved_staging:'Aprobado en staging', status_reference:'Referencia',
-      status_attachment:'Adjunto', status_reference_and_attachment:'Referencia y adjunto'
+      status_attachment:'Adjunto', status_reference_and_attachment:'Referencia y adjunto',
+      decision:'Decisión', decisionIntro:'Construye alternativas con requisitos confirmados, productos del expediente y evidencia real. QuoteOps calcula el costo desde la fuente y exige revisión humana.',
+      technicalRequirements:'Requisitos técnicos', addRequirement:'Añadir requisito', saveRequirements:'Guardar requisitos',
+      openDecisionQuestions:'Preguntas para decidir', questionsPlaceholder:'Una pregunta pendiente por línea',
+      decisionAssistant:'Asistente para decidir', decisionAssistantNote:'Registra la elección del operador; no afirma el modelo que ejecuta QuoteOps.',
+      requirementText:'Describe el requisito', configurationAlternatives:'Alternativas de configuración', alternative:'Alternativa',
+      alternativeTitle:'Nombre de la alternativa', alternativeObjective:'Objetivo y criterio de diseño', addProduct:'Añadir producto',
+      sourceProduct:'Producto con fuente', role:'Función', compatibility:'Compatibilidad', rationale:'Justificación',
+      evidence:'Evidencia confirmada', saveAlternative:'Guardar alternativa', approveAlternative:'Aprobar alternativa', rejectAlternative:'Rechazar alternativa',
+      reviewedBy:'Revisado por', noSupplierProducts:'Primero registra una oferta real en el expediente.', noConfirmedEvidence:'Sin evidencia confirmada',
+      realCostOnly:'Costo resuelto desde ofertas reales', saved:'Cambios guardados',
+      status_collecting_requirements:'Reuniendo requisitos', status_drafting_alternatives:'Preparando alternativas',
+      status_needs_validation:'Necesita validación', status_ready_for_review:'Lista para revisión', status_approved:'Aprobada',
+      status_incompatible:'Incompatible', category_legacy:'Sistema anterior', category_infrastructure:'Infraestructura',
+      category_door:'Puerta', category_credential:'Credenciales', category_software:'Software', category_commercial:'Comercial', category_other:'Otro',
+      priority_must:'Obligatorio', priority_should:'Recomendado', priority_could:'Opcional',
+      requirement_confirmed:'Confirmado', requirement_assumption:'Supuesto', requirement_needs_validation:'Por validar',
+      coverage:'Cobertura', gaps:'Brechas', phase_design:'Diseño técnico'
     });
     Object.assign(I18N.en, {
       catalogDrafts:'Products or services awaiting approval', status_draft:'Pending draft',
       status_approved_staging:'Approved in staging', status_reference:'Reference',
-      status_attachment:'Attachment', status_reference_and_attachment:'Reference and attachment'
+      status_attachment:'Attachment', status_reference_and_attachment:'Reference and attachment',
+      decision:'Decision', decisionIntro:'Build alternatives from confirmed requirements, case products, and real evidence. QuoteOps resolves source costs and requires human review.',
+      technicalRequirements:'Technical requirements', addRequirement:'Add requirement', saveRequirements:'Save requirements',
+      openDecisionQuestions:'Decision questions', questionsPlaceholder:'One open question per line',
+      decisionAssistant:'Decision assistant', decisionAssistantNote:'Records the operator choice; it does not claim which model runs QuoteOps.',
+      requirementText:'Describe the requirement', configurationAlternatives:'Configuration alternatives', alternative:'Alternative',
+      alternativeTitle:'Alternative name', alternativeObjective:'Objective and design criteria', addProduct:'Add product',
+      sourceProduct:'Sourced product', role:'Role', compatibility:'Compatibility', rationale:'Rationale',
+      evidence:'Confirmed evidence', saveAlternative:'Save alternative', approveAlternative:'Approve alternative', rejectAlternative:'Reject alternative',
+      reviewedBy:'Reviewed by', noSupplierProducts:'Record a real supplier offer in the case first.', noConfirmedEvidence:'No confirmed evidence',
+      realCostOnly:'Cost resolved from real offers', saved:'Changes saved',
+      status_collecting_requirements:'Collecting requirements', status_drafting_alternatives:'Drafting alternatives',
+      status_needs_validation:'Needs validation', status_ready_for_review:'Ready for review', status_approved:'Approved',
+      status_incompatible:'Incompatible', category_legacy:'Legacy system', category_infrastructure:'Infrastructure',
+      category_door:'Door', category_credential:'Credentials', category_software:'Software', category_commercial:'Commercial', category_other:'Other',
+      priority_must:'Must have', priority_should:'Should have', priority_could:'Could have',
+      requirement_confirmed:'Confirmed', requirement_assumption:'Assumption', requirement_needs_validation:'Needs validation',
+      coverage:'Coverage', gaps:'Gaps', phase_design:'Technical design'
     });
     const WORK_STATUS = {
       es: {in_progress:'En curso', needs_input:'Faltan datos', ready_for_quote:'Listo para cotizar', awaiting_approval:'Pendiente de aprobación', ready_for_delivery:'Listo para entrega', completed:'Completado'},
@@ -267,6 +321,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     let missionId = localStorage.getItem('quoteops.mission_id') || '';
     let dossier = null;
     let selectedFiles = [];
+    let selectedAlternativeCode = 'A';
     const $ = (id) => document.getElementById(id);
     const t = (key) => I18N[language][key] || key;
     const statusText = (value) => I18N[language][`status_${value}`] || WORK_STATUS[language][value] || value;
@@ -280,6 +335,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       return payload;
     }
     function escapeHtml(value) { const el = document.createElement('span'); el.textContent = String(value ?? ''); return el.innerHTML; }
+    function escapeAttr(value) { return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
     function showToast(message) { const el = $('toast'); el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
     function appendMessage(role, text) { const el = document.createElement('div'); el.className = `message ${role}`; const label = document.createElement('small'); label.textContent = role === 'assistant' ? 'QuoteOps' : (language === 'es' ? 'Tú' : 'You'); const body = document.createElement('span'); body.textContent = text; el.append(label, body); $('messages').appendChild(el); $('messages').scrollTop = $('messages').scrollHeight; }
     function applyLanguage() {
@@ -297,6 +353,114 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     function listSection(title, items) {
       const content = items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : `<div class="empty">${t('noData')}</div>`;
       return `<div class="section"><h3>${title}</h3>${content}</div>`;
+    }
+    function selectOptions(items, current, label) {
+      return items.map((item) => `<option value="${escapeAttr(item)}" ${item === current ? 'selected' : ''}>${escapeHtml(label(item))}</option>`).join('');
+    }
+    function requirementRow(item = {}) {
+      const categories = ['legacy','infrastructure','door','credential','software','commercial','other'];
+      const priorities = ['must','should','could'];
+      const statuses = ['confirmed','assumption','needs_validation'];
+      return `<div class="requirement-row" data-requirement-id="${escapeAttr(item.requirement_id || '')}">
+        <select class="req-category" aria-label="${t('technicalRequirements')}">${selectOptions(categories, item.category || 'other', (value) => t(`category_${value}`))}</select>
+        <select class="req-priority" aria-label="Priority">${selectOptions(priorities, item.priority || 'must', (value) => t(`priority_${value}`))}</select>
+        <select class="req-status" aria-label="Status">${selectOptions(statuses, item.status || 'confirmed', (value) => t(`requirement_${value}`))}</select>
+        <input class="req-text" value="${escapeAttr(item.text || '')}" placeholder="${escapeAttr(t('requirementText'))}" />
+        <button class="row-remove" type="button" aria-label="Remove">×</button>
+      </div>`;
+    }
+    function supplierProducts() {
+      return values(dossier?.supplier_offers).flatMap((offer) => values(offer.lines).map((line) => ({offer, line})));
+    }
+    function confirmedEvidence() { return values(dossier?.extracted_evidence).filter((item) => item.status === 'confirmed'); }
+    function alternativeLineRow(item = {}) {
+      const products = supplierProducts();
+      const productOptions = products.length
+        ? products.map(({offer, line}) => `<option value="${escapeAttr(line.line_id)}" ${line.line_id === item.source_offer_line_id ? 'selected' : ''}>${escapeHtml(`${line.sku || line.description} · ${offer.supplier_name} · USD ${Number(line.unit_cost || 0).toFixed(2)}`)}</option>`).join('')
+        : `<option value="">${t('noSupplierProducts')}</option>`;
+      const evidence = confirmedEvidence();
+      const selectedEvidence = values(item.evidence_ids)[0] || '';
+      const evidenceOptions = `<option value="">${t('noConfirmedEvidence')}</option>` + evidence.map((entry) => `<option value="${escapeAttr(entry.evidence_id)}" ${entry.evidence_id === selectedEvidence ? 'selected' : ''}>${escapeHtml(entry.source_file_name)} · ${escapeHtml(entry.evidence_id)}</option>`).join('');
+      return `<div class="alternative-line">
+        <select class="alt-source wide" aria-label="${t('sourceProduct')}">${productOptions}</select>
+        <input class="alt-qty" type="number" min="0.01" step="0.01" value="${Number(item.quantity || 1)}" aria-label="${t('qty')}" />
+        <input class="alt-role" value="${escapeAttr(item.role || 'equipment')}" placeholder="${escapeAttr(t('role'))}" />
+        <select class="alt-compatibility" aria-label="${t('compatibility')}">${selectOptions(['needs_validation','verified','incompatible'], item.compatibility_status || 'needs_validation', statusText)}</select>
+        <select class="alt-evidence wide" aria-label="${t('evidence')}">${evidenceOptions}</select>
+        <input class="alt-rationale wide" value="${escapeAttr(item.rationale || '')}" placeholder="${escapeAttr(t('rationale'))}" />
+        <button class="row-remove" type="button" aria-label="Remove">×</button>
+      </div>`;
+    }
+    function splitLines(value) { return String(value || '').split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
+    function renderDecisionWorkspace(workspace = {}) {
+      const requirements = values(workspace.requirements);
+      const alternatives = values(workspace.alternatives);
+      const alternative = alternatives.find((item) => item.code === selectedAlternativeCode) || {};
+      const updatedBy = localStorage.getItem('quoteops.updated_by') || 'Rafael';
+      const lineRows = values(alternative.lines).length ? alternative.lines.map(alternativeLineRow).join('') : alternativeLineRow();
+      $('decisionWorkspace').innerHTML = `
+        <div class="decision-intro">${t('decisionIntro')}<div class="cost-proof"><span>${escapeHtml(statusText(workspace.status || 'collecting_requirements'))}</span><span>${escapeHtml(workspace.last_channel || 'web')}</span></div></div>
+        <div class="decision-card"><h3>${t('technicalRequirements')}</h3><div id="decisionRequirementRows">${requirements.map(requirementRow).join('')}</div>
+          <div class="decision-actions"><button class="action secondary" id="addRequirementBtn">${t('addRequirement')}</button></div>
+          <label class="decision-field full">${t('openDecisionQuestions')}<textarea id="decisionQuestions" rows="3" placeholder="${escapeAttr(t('questionsPlaceholder'))}">${escapeHtml(values(workspace.open_questions).join('\n'))}</textarea></label>
+          <label class="decision-field full">${t('decisionAssistant')}<input id="decisionModel" list="decisionModelChoices" value="${escapeAttr(workspace.selected_model || '')}" /></label>
+          <datalist id="decisionModelChoices"><option value="ChatGPT / GPT-5.6 Sol operator session"></option><option value="Codex-built / MCP"></option><option value="Manual review"></option></datalist>
+          <div class="decision-note">${t('decisionAssistantNote')}</div>
+          <div class="decision-actions"><button class="action" id="saveRequirementsBtn">${t('saveRequirements')}</button></div>
+        </div>
+        <div class="decision-card"><h3>${t('configurationAlternatives')}</h3>
+          <div class="decision-grid"><label class="decision-field">${t('alternative')}<select id="decisionAlternativeCode">${selectOptions(['A','B','C'], selectedAlternativeCode, (value) => value)}</select></label><label class="decision-field">${t('status')}<input value="${escapeAttr(statusText(alternative.status || 'draft'))}" disabled /></label>
+          <label class="decision-field full">${t('alternativeTitle')}<input id="alternativeTitle" value="${escapeAttr(alternative.title || '')}" /></label>
+          <label class="decision-field full">${t('alternativeObjective')}<textarea id="alternativeObjective" rows="2">${escapeHtml(alternative.objective || '')}</textarea></label></div>
+          <div id="alternativeLines">${lineRows}</div>
+          <div class="decision-actions"><button class="action secondary" id="addAlternativeLineBtn" ${supplierProducts().length ? '' : 'disabled'}>${t('addProduct')}</button></div>
+          <div class="decision-grid">
+            <label class="decision-field">${t('coverage')}<textarea id="alternativeCoverage" rows="2">${escapeHtml(values(alternative.coverage).join('\n'))}</textarea></label>
+            <label class="decision-field">${t('gaps')}<textarea id="alternativeGaps" rows="2">${escapeHtml(values(alternative.gaps).join('\n'))}</textarea></label>
+            <label class="decision-field">${t('assumptions')}<textarea id="alternativeAssumptions" rows="2">${escapeHtml(values(alternative.assumptions).join('\n'))}</textarea></label>
+            <label class="decision-field">${t('risks')}<textarea id="alternativeRisks" rows="2">${escapeHtml(values(alternative.risks).join('\n'))}</textarea></label>
+          </div>
+          <div class="cost-proof"><span>${t('realCostOnly')}</span><span>USD ${Number(alternative.supplier_cost_total || 0).toFixed(2)}</span></div>
+          <label class="decision-field">${t('reviewedBy')}<input id="decisionReviewedBy" value="${escapeAttr(updatedBy)}" /></label>
+          <div class="decision-actions"><button class="action" id="saveAlternativeBtn">${t('saveAlternative')}</button><button class="action secondary" id="approveAlternativeBtn" ${alternative.status !== 'ready_for_review' ? 'disabled' : ''}>${t('approveAlternative')}</button><button class="action secondary" id="rejectAlternativeBtn" ${!alternative.code ? 'disabled' : ''}>${t('rejectAlternative')}</button></div>
+        </div>`;
+      document.querySelectorAll('#decisionWorkspace .row-remove').forEach((button) => button.addEventListener('click', () => button.parentElement.remove()));
+      $('addRequirementBtn').addEventListener('click', () => { $('decisionRequirementRows').insertAdjacentHTML('beforeend', requirementRow()); bindDecisionRemoveButtons(); });
+      $('addAlternativeLineBtn').addEventListener('click', () => { $('alternativeLines').insertAdjacentHTML('beforeend', alternativeLineRow()); bindDecisionRemoveButtons(); });
+      $('decisionAlternativeCode').addEventListener('change', (event) => { selectedAlternativeCode = event.target.value; renderDecisionWorkspace(workspace); });
+      $('saveRequirementsBtn').addEventListener('click', saveDecisionBrief);
+      $('saveAlternativeBtn').addEventListener('click', saveConfigurationAlternative);
+      $('approveAlternativeBtn').addEventListener('click', () => reviewConfigurationAlternative('approve'));
+      $('rejectAlternativeBtn').addEventListener('click', () => reviewConfigurationAlternative('reject'));
+    }
+    function bindDecisionRemoveButtons() { document.querySelectorAll('#decisionWorkspace .row-remove').forEach((button) => { button.onclick = () => button.parentElement.remove(); }); }
+    async function saveDecisionBrief() {
+      if (!missionId) { showToast(t('missionFirst')); return; }
+      const requirements = [...document.querySelectorAll('.requirement-row')].map((row) => ({requirement_id:row.dataset.requirementId || '', category:row.querySelector('.req-category').value, priority:row.querySelector('.req-priority').value, status:row.querySelector('.req-status').value, text:row.querySelector('.req-text').value.trim()})).filter((item) => item.text);
+      const updatedBy = $('decisionReviewedBy')?.value.trim() || localStorage.getItem('quoteops.updated_by') || 'Rafael';
+      localStorage.setItem('quoteops.updated_by', updatedBy);
+      try {
+        const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/decision-brief`, {method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, source_channel:'web', updated_by:updatedBy, requirements, open_questions:splitLines($('decisionQuestions').value), replace_requirements:true, replace_open_questions:true, selected_model:$('decisionModel').value.trim()})});
+        renderMission(result); showToast(t('saved'));
+      } catch (error) { showToast(error.message); }
+    }
+    async function saveConfigurationAlternative() {
+      if (!missionId) { showToast(t('missionFirst')); return; }
+      const lines = [...document.querySelectorAll('.alternative-line')].map((row) => ({offer_line_id:row.querySelector('.alt-source').value, quantity:Number(row.querySelector('.alt-qty').value), role:row.querySelector('.alt-role').value.trim(), compatibility_status:row.querySelector('.alt-compatibility').value, rationale:row.querySelector('.alt-rationale').value.trim(), evidence_ids:row.querySelector('.alt-evidence').value ? [row.querySelector('.alt-evidence').value] : []})).filter((item) => item.offer_line_id);
+      if (!lines.length) { showToast(t('noSupplierProducts')); return; }
+      const updatedBy = $('decisionReviewedBy').value.trim() || 'Rafael'; localStorage.setItem('quoteops.updated_by', updatedBy);
+      const selectedModel = $('decisionModel').value.trim();
+      try {
+        const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/alternatives/${selectedAlternativeCode}`, {method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, source_channel:'web', code:selectedAlternativeCode, title:$('alternativeTitle').value.trim() || `${t('alternative')} ${selectedAlternativeCode}`, objective:$('alternativeObjective').value.trim(), lines, coverage:splitLines($('alternativeCoverage').value), gaps:splitLines($('alternativeGaps').value), assumptions:splitLines($('alternativeAssumptions').value), risks:splitLines($('alternativeRisks').value), generated_by:'web', selected_model:selectedModel, updated_by:updatedBy})});
+        renderMission(result); showToast(t('saved'));
+      } catch (error) { showToast(error.message); }
+    }
+    async function reviewConfigurationAlternative(decision) {
+      const reviewedBy = $('decisionReviewedBy').value.trim() || 'Rafael'; localStorage.setItem('quoteops.updated_by', reviewedBy);
+      try {
+        const result = await fetchJson(`/api/conversation/missions/${encodeURIComponent(missionId)}/alternatives/${selectedAlternativeCode}/review`, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({idempotency_key:newKey(), language, decision, reviewed_by:reviewedBy, notes:''})});
+        renderMission(result); showToast(t('saved'));
+      } catch (error) { showToast(error.message); }
     }
     function renderDossier(data) {
       dossier = data;
@@ -322,12 +486,13 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
       html += listSection(t('extractedEvidence'), evidenceItems);
       html += listSection(t('supplierOffers'), supplierItems);
       html += listSection(t('catalogDrafts'), catalogItems);
-      if (values(data.options).length) html += `<div class="section"><h3>${t('options')}</h3>${data.options.map((item) => `<div class="option"><strong>${escapeHtml(item.code)} · ${escapeHtml(item.title)}</strong><span>${escapeHtml(item.summary)}</span><div class="option-meta"><span>${escapeHtml(statusText(item.status))} · ${t('supplierCost')} USD ${Number(item.supplier_cost_total || 0).toFixed(2)}</span><button data-option-code="${escapeHtml(item.code)}">${t('selectPackage')}</button></div></div>`).join('')}</div>`;
+      if (values(data.options).length) html += `<div class="section"><h3>${t('options')}</h3>${data.options.map((item) => `<div class="option"><strong>${escapeHtml(item.code)} · ${escapeHtml(item.title)}</strong><span>${escapeHtml(item.summary)}</span><div class="option-meta"><span>${escapeHtml(statusText(item.status))} · ${t('supplierCost')} USD ${Number(item.supplier_cost_total || 0).toFixed(2)}</span><button data-option-code="${escapeHtml(item.code)}" ${['needs_validation','ready_for_review'].includes(item.status) ? 'disabled' : ''}>${t('selectPackage')}</button></div></div>`).join('')}</div>`;
       html += listSection(t('attachments'), attachmentItems);
       if (!data.quote && values(data.confirmed_scope).length) html += `<button class="action" id="prepareQuoteBtn">${t('prepareQuote')}</button>`;
       $('dossierSections').innerHTML = html;
       document.querySelectorAll('[data-option-code]').forEach((button) => button.addEventListener('click', () => selectPackage(button.dataset.optionCode)));
       $('prepareQuoteBtn')?.addEventListener('click', () => sendMessage(language === 'es' ? 'Preparar cotización editable' : 'Prepare the editable quote'));
+      renderDecisionWorkspace(data.decision_workspace || {});
       renderQuote(data.quote);
     }
     function renderQuote(quote) {
@@ -383,7 +548,7 @@ def render_cockpit_page(payload: dict[str, Any]) -> str:
     }
     async function refreshTraces() { try { const data = await fetchJson('/api/integrations/trace'); $('runtimeLabel').textContent = data.runtime_label; renderTraces(data.items); } catch {} }
     document.querySelectorAll('.lang button').forEach((button) => button.addEventListener('click', () => { language = button.dataset.lang; applyLanguage(); }));
-    document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('.tabs button').forEach((item) => item.classList.toggle('active', item === button)); $('dossierPanel').hidden = button.dataset.tab !== 'dossier'; $('tracesPanel').hidden = button.dataset.tab !== 'traces'; if (button.dataset.tab === 'traces') refreshTraces(); }));
+    document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('.tabs button').forEach((item) => item.classList.toggle('active', item === button)); $('dossierPanel').hidden = button.dataset.tab !== 'dossier'; $('decisionPanel').hidden = button.dataset.tab !== 'decision'; $('tracesPanel').hidden = button.dataset.tab !== 'traces'; if (button.dataset.tab === 'traces') refreshTraces(); }));
     $('attachBtn').addEventListener('click', () => $('fileInput').click());
     $('fileInput').addEventListener('change', (event) => { selectedFiles = [...event.target.files].slice(0,20); renderSelectedFiles(); });
     $('sendBtn').addEventListener('click', () => sendMessage());

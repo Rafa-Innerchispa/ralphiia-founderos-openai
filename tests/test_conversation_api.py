@@ -35,6 +35,8 @@ class TestConversationApi(unittest.TestCase):
         self.assertIn("Cuéntame qué necesitas construir", body)
         self.assertIn("Tell me what you need to build", body)
         self.assertIn("Codex-built / MCP runtime", body)
+        self.assertIn("Asistente para decidir", body)
+        self.assertIn("Decision assistant", body)
         self.assertNotIn("Intake Composer", body)
         self.assertNotIn("Preview fallback", body)
         self.assertNotIn("sandbox safe", body)
@@ -95,6 +97,40 @@ class TestConversationApi(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["detail"]["code"], "validation_error")
         self.assertIn("Review", response.json()["detail"]["message"])
+
+    def test_whatsapp_and_chatgpt_continue_the_same_mission_idempotently(self):
+        event_id = f"wa-{uuid4()}"
+        payload = {
+            "channel": "whatsapp",
+            "payload": {
+                "event_id": event_id,
+                "language": "es",
+                "name": "FEMAR",
+                "phone": "0990000000",
+                "text": "Necesitamos revisar el proyecto de control de acceso en Guayaquil.",
+            },
+        }
+        first = self.client.post("/api/conversation/channel-events", json=payload)
+        replay = self.client.post("/api/conversation/channel-events", json=payload)
+        mission_id = first.json()["mission_id"]
+        continued = self.client.post(
+            "/api/conversation/messages",
+            json={
+                "mission_id": mission_id,
+                "idempotency_key": f"chatgpt-{uuid4()}",
+                "language": "en",
+                "source_channel": "chatgpt_mcp",
+                "message": "Continue this same case without creating a duplicate.",
+            },
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()["dossier"]["customer"]["name"], "FEMAR")
+        self.assertEqual(first.json()["dossier"]["work_item"]["source_channel"], "whatsapp")
+        self.assertTrue(replay.json()["idempotent_replay"])
+        self.assertTrue(replay.json()["channel_event"]["deduplicated"])
+        self.assertEqual(continued.json()["mission_id"], mission_id)
+        self.assertEqual(continued.json()["language"], "en")
 
 
 if __name__ == "__main__":

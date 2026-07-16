@@ -5,17 +5,26 @@
     "title_es": "QuoteOps se construye en abierto con evidencia verificable",
     "title_en": "QuoteOps is being built in the open with verifiable evidence",
     "status": "active",
-    "phase_es": "H3 multimodal verificado · H4 es el siguiente hito",
-    "phase_en": "H3 multimodal verified · H4 is the next milestone",
-    "progress_percent": 43
+    "phase_es": "Espacio de decisión multicanal en verificación de staging",
+    "phase_en": "Multichannel decision workspace under staging verification",
+    "progress_percent": 52
   },
   "verification": {
-    "tests_passed": 50,
-    "tests_total": 50,
+    "tests_passed": 54,
+    "tests_total": 54,
     "staging_status": "healthy",
     "commit": "f0abb2e"
   },
   "decisions": [
+    {
+      "id": "decision-sourced-configurations",
+      "title_es": "Las configuraciones usan costos con fuente",
+      "title_en": "Configurations use sourced costs",
+      "summary_es": "Los canales comparten un expediente; las alternativas solo pueden usar ofertas registradas y necesitan revisión humana antes de cotizarse.",
+      "summary_en": "Channels share one case; alternatives can only use recorded supplier offers and require human review before quoting.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T18:20:00+00:00"
+    },
     {
       "id": "decision-source-truth",
       "title_es": "Los datos comerciales conservan lo desconocido",
@@ -72,6 +81,19 @@
     }
   ],
   "events": [
+    {
+      "id": "event-multichannel-decision-workspace",
+      "type": "verification",
+      "title_es": "Espacio de decisión multicanal implementado",
+      "title_en": "Multichannel decision workspace implemented",
+      "summary_es": "Web, ChatGPT MCP y mensajería pueden continuar la misma misión y preparar alternativas verificables sin inventar costos ni omitir aprobación humana.",
+      "summary_en": "Web, ChatGPT MCP, and messaging can continue the same mission and prepare verifiable alternatives without inventing costs or bypassing human approval.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T18:20:00+00:00",
+      "evidence": {
+        "tests": "54/54"
+      }
+    },
     {
       "id": "event-real-supplier-ingestion",
       "type": "verification",

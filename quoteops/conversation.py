@@ -15,8 +15,14 @@ from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize
 from quoteops.contracts import (
     ContextDossier,
     CatalogDraftReviewRequest,
+    ConfigurationAlternative,
+    ConfigurationAlternativeUpsertRequest,
+    ConfigurationLine,
+    ConfigurationReviewRequest,
     ConversationMessageRequest,
     ConversationReply,
+    DecisionBriefUpdateRequest,
+    DecisionWorkspace,
     DossierCustomer,
     DossierOption,
     DossierSite,
@@ -51,11 +57,13 @@ TEXT = {
         "question_schedule": "¿Qué restricciones operativas y fecha objetivo debemos considerar?",
         "reply_progress": "Ya incorporé la información al expediente. Para avanzar necesito: {questions}",
         "reply_ready": "El expediente tiene contexto suficiente. Puedes pedirme preparar la cotización editable.",
+        "reply_design": "El espacio de decisión está actualizado. Las alternativas deben usar productos y costos con fuente real antes de revisión humana.",
         "reply_quote": "Preparé un borrador editable sin inventar precios. Completa los valores reales antes de enviarlo a aprobación.",
         "reply_approved": "La aprobación humana quedó registrada y el PDF real está listo.",
         "reply_delivered": "La entrega quedó registrada con su identificador y trazabilidad.",
         "task_next_input": "Completar identidad, sitio, alcance y evidencia de costos.",
         "task_next_quote": "Seleccionar un paquete y confirmar precios de venta.",
+        "task_next_design": "Completar y revisar las alternativas técnicas con evidencia real.",
         "task_next_approval": "Revisar la cotización y registrar aprobación humana.",
         "task_next_delivery": "Registrar la entrega aprobada.",
         "task_done": "Entrega registrada.",
@@ -76,11 +84,13 @@ TEXT = {
         "question_schedule": "Which operating constraints and target date should we consider?",
         "reply_progress": "I added the information to the case file. To continue I need: {questions}",
         "reply_ready": "The case file has enough context. You can ask me to prepare the editable quote.",
+        "reply_design": "The decision workspace is updated. Alternatives must use products and costs from real sources before human review.",
         "reply_quote": "I prepared an editable draft without inventing prices. Enter the real values before human approval.",
         "reply_approved": "Human approval was recorded and the real PDF is ready.",
         "reply_delivered": "Delivery was registered with its identifier and trace.",
         "task_next_input": "Complete identity, site, scope, and cost evidence.",
         "task_next_quote": "Select a package and confirm selling prices.",
+        "task_next_design": "Complete and review the technical alternatives with real evidence.",
         "task_next_approval": "Review the quote and record human approval.",
         "task_next_delivery": "Register delivery of the approved quote.",
         "task_done": "Delivery registered.",
@@ -151,6 +161,8 @@ class ConversationService:
             mission["language"] = request.language
             if mission["dossier"].get("work_item"):
                 mission["dossier"]["work_item"]["source_channel"] = request.source_channel
+            workspace = mission["dossier"].setdefault("decision_workspace", {})
+            workspace["last_channel"] = request.source_channel
             mission["messages"].append(
                 {
                     "role": "user",
@@ -159,7 +171,17 @@ class ConversationService:
                     "at": self._now(),
                 }
             )
-            self._add_event(mission, "message_received", "Conversation input recorded")
+            self._add_event(
+                mission,
+                "message_received",
+                f"Conversation input recorded from {request.source_channel}",
+            )
+            if request.channel_event_id:
+                self._add_event(
+                    mission,
+                    "channel_event_received",
+                    f"{request.source_channel} event {request.channel_event_id} recorded",
+                )
             self._apply_message(mission, request)
             reply = self._reply(mission)
             mission["messages"].append({"role": "assistant", "text": reply, "at": self._now()})
@@ -189,6 +211,8 @@ class ConversationService:
                 return ConversationReply.model_validate(replay)
             mission = self._require_mission(mission_id)
             current = EditableQuote.model_validate(mission["dossier"].get("quote") or {})
+            if current.status in {"approved", "delivered"}:
+                raise ValueError("approved_quote_locked")
             previous = {line.line_id: line for line in current.lines}
             merged_lines: list[EditableQuoteLine] = []
             for line in request.lines:
@@ -484,6 +508,254 @@ class ConversationService:
             self._save_operation(request.idempotency_key, mission_id, "catalog_review", response)
             return response
 
+    def update_decision_brief(
+        self,
+        mission_id: str,
+        request: DecisionBriefUpdateRequest,
+    ) -> dict[str, Any]:
+        """Update shared requirements without generating or selecting a proposal."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            workspace = self._workspace(mission)
+            existing = [] if request.replace_requirements else list(workspace["requirements"])
+            removals = set(request.remove_requirement_ids)
+            existing = [item for item in existing if item.get("requirement_id") not in removals]
+            by_id = {item["requirement_id"]: item for item in existing}
+            by_key = {
+                self._requirement_key(item.get("category", "other"), item.get("text", "")): item
+                for item in existing
+            }
+            for raw in request.requirements:
+                requirement_key = self._requirement_key(raw.category, raw.text)
+                current = by_id.get(raw.requirement_id) if raw.requirement_id else by_key.get(requirement_key)
+                requirement_id = raw.requirement_id or (
+                    current.get("requirement_id")
+                    if current
+                    else "requirement_" + sha256(requirement_key.encode()).hexdigest()[:18]
+                )
+                value = {
+                    **raw.model_dump(),
+                    "requirement_id": requirement_id,
+                    "source_channel": request.source_channel,
+                    "source_event_id": request.channel_event_id,
+                    "updated_by": request.updated_by,
+                    "updated_at": self._now(),
+                }
+                if current:
+                    by_key.pop(
+                        self._requirement_key(
+                            current.get("category", "other"),
+                            current.get("text", ""),
+                        ),
+                        None,
+                    )
+                    position = existing.index(current)
+                    existing[position] = value
+                    by_id.pop(current.get("requirement_id", ""), None)
+                else:
+                    existing.append(value)
+                by_id[requirement_id] = value
+                by_key[requirement_key] = value
+
+            questions = [] if request.replace_open_questions else list(workspace["open_questions"])
+            for question in request.open_questions:
+                clean = str(question or "").strip()
+                if clean and clean not in questions:
+                    questions.append(clean)
+            requirements_changed = existing != workspace["requirements"]
+            quote = mission["dossier"].get("quote") or {}
+            if requirements_changed and quote.get("status") in {"approved", "delivered"}:
+                raise ValueError("approved_quote_locked")
+            workspace.update(
+                {
+                    "requirements": existing,
+                    "open_questions": questions,
+                    "last_channel": request.source_channel,
+                    "selected_model": request.selected_model or workspace.get("selected_model", ""),
+                    "revision": workspace.get("revision", 0) + 1,
+                }
+            )
+            if requirements_changed:
+                mission["dossier"]["quote"] = None
+                for alternative in workspace["alternatives"]:
+                    if alternative.get("status") in {"ready_for_review", "approved"}:
+                        alternative["status"] = "needs_validation"
+                        alternative["reviewed_by"] = ""
+                        alternative["review_notes"] = ""
+            mission["language"] = request.language
+            self._refresh_decision_workspace(workspace)
+            self._add_event(
+                mission,
+                "requirements_updated",
+                f"Decision requirements updated from {request.source_channel}",
+            )
+            self._refresh_questions(mission)
+            self._refresh_options(mission)
+            self._set_progress_and_phase(mission)
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "decision_workspace": workspace}
+            self._save_operation(request.idempotency_key, mission_id, "decision_brief", response)
+            return response
+
+    def upsert_configuration_alternative(
+        self,
+        mission_id: str,
+        request: ConfigurationAlternativeUpsertRequest,
+    ) -> dict[str, Any]:
+        """Resolve every configuration line from mission evidence; caller costs are never accepted."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            quote = mission["dossier"].get("quote") or {}
+            if quote.get("status") in {"approved", "delivered"}:
+                raise ValueError("approved_quote_locked")
+            workspace = self._workspace(mission)
+            resolved_lines: list[ConfigurationLine] = []
+            used_offer_lines: set[str] = set()
+            for raw in request.lines:
+                offer, line = self._resolve_offer_line(mission["dossier"], raw.offer_line_id, raw.sku)
+                source_line_id = str(line.get("line_id") or "")
+                if source_line_id in used_offer_lines:
+                    raise ValueError("configuration_item_duplicated")
+                used_offer_lines.add(source_line_id)
+                evidence_ids = list(dict.fromkeys(raw.evidence_ids))
+                evidence = self._resolve_evidence(mission["dossier"], evidence_ids)
+                if raw.compatibility_status == "verified":
+                    if not evidence_ids:
+                        raise ValueError("configuration_evidence_required")
+                    if any(item.get("status") != "confirmed" for item in evidence):
+                        raise ValueError("configuration_evidence_not_confirmed")
+                    if not line.get("canonical_item_id"):
+                        raise ValueError("configuration_catalog_review_required")
+                quantity = raw.quantity
+                unit_cost = float(line.get("unit_cost") or 0)
+                resolved_lines.append(
+                    ConfigurationLine(
+                        line_id="configline_"
+                        + sha256(f"{request.code}:{source_line_id}:{raw.role}".encode()).hexdigest()[:18],
+                        source_offer_id=str(offer.get("offer_id") or ""),
+                        source_offer_line_id=source_line_id,
+                        supplier_name=str(offer.get("supplier_name") or ""),
+                        canonical_item_id=str(line.get("canonical_item_id") or ""),
+                        sku=str(line.get("sku") or ""),
+                        description=str(line.get("description") or ""),
+                        kind=str(line.get("kind") or "equipment"),
+                        unit=str(line.get("unit") or "unit"),
+                        quantity=quantity,
+                        unit_cost=unit_cost,
+                        line_cost=round(quantity * unit_cost, 2),
+                        role=raw.role,
+                        compatibility_status=raw.compatibility_status,
+                        rationale=raw.rationale,
+                        evidence_ids=evidence_ids,
+                    )
+                )
+            previous = next(
+                (item for item in workspace["alternatives"] if item.get("code") == request.code),
+                None,
+            )
+            needs_validation = bool(request.gaps) or any(
+                line.compatibility_status != "verified" for line in resolved_lines
+            )
+            alternative = ConfigurationAlternative(
+                code=request.code,
+                title=request.title,
+                objective=request.objective,
+                status="needs_validation" if needs_validation else "ready_for_review",
+                lines=resolved_lines,
+                supplier_cost_total=round(sum(item.line_cost for item in resolved_lines), 2),
+                coverage=request.coverage,
+                gaps=request.gaps,
+                assumptions=request.assumptions,
+                risks=request.risks,
+                generated_by=request.generated_by,
+                selected_model=request.selected_model,
+                updated_by=request.updated_by,
+                updated_at=self._now(),
+                revision=(int(previous.get("revision", 0)) + 1 if previous else 1),
+            ).model_dump()
+            if previous:
+                workspace["alternatives"][workspace["alternatives"].index(previous)] = alternative
+            else:
+                workspace["alternatives"].append(alternative)
+            mission["dossier"]["quote"] = None
+            workspace.update(
+                {
+                    "last_channel": request.source_channel,
+                    "selected_model": request.selected_model or workspace.get("selected_model", ""),
+                    "revision": workspace.get("revision", 0) + 1,
+                }
+            )
+            mission["language"] = request.language
+            self._refresh_decision_workspace(workspace)
+            self._add_event(
+                mission,
+                "alternative_updated",
+                f"Alternative {request.code} updated from {request.source_channel}",
+            )
+            self._refresh_options(mission)
+            self._set_progress_and_phase(mission)
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "alternative": alternative}
+            self._save_operation(request.idempotency_key, mission_id, "alternative_upsert", response)
+            return response
+
+    def review_configuration_alternative(
+        self,
+        mission_id: str,
+        code: str,
+        request: ConfigurationReviewRequest,
+    ) -> dict[str, Any]:
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            workspace = self._workspace(mission)
+            alternative = next(
+                (item for item in workspace["alternatives"] if item.get("code") == code),
+                None,
+            )
+            if alternative is None:
+                raise ValueError("configuration_alternative_not_found")
+            if request.decision == "approve":
+                if alternative.get("status") != "ready_for_review":
+                    raise ValueError("configuration_validation_required")
+                alternative["status"] = "approved"
+            else:
+                alternative["status"] = "rejected"
+                quote = mission["dossier"].get("quote") or {}
+                if quote.get("selected_option_code") == code:
+                    if quote.get("status") in {"approved", "delivered"}:
+                        raise ValueError("approved_quote_locked")
+                    mission["dossier"]["quote"] = None
+            alternative.update(
+                {
+                    "reviewed_by": request.reviewed_by,
+                    "review_notes": request.notes,
+                    "updated_at": self._now(),
+                }
+            )
+            workspace["revision"] = workspace.get("revision", 0) + 1
+            mission["language"] = request.language
+            self._refresh_decision_workspace(workspace)
+            self._add_event(
+                mission,
+                "alternative_reviewed",
+                f"Alternative {code} {alternative['status']} by {request.reviewed_by}",
+            )
+            self._refresh_options(mission)
+            self._set_progress_and_phase(mission)
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "alternative": alternative}
+            self._save_operation(request.idempotency_key, mission_id, "alternative_review", response)
+            return response
+
     def select_package(
         self,
         mission_id: str,
@@ -495,6 +767,9 @@ class ConversationService:
                 replay["idempotent_replay"] = True
                 return ConversationReply.model_validate(replay)
             mission = self._require_mission(mission_id)
+            current_quote = mission["dossier"].get("quote") or {}
+            if current_quote.get("status") in {"approved", "delivered"}:
+                raise ValueError("approved_quote_locked")
             mission["language"] = request.language
             quote = self._quote_for_package(mission["dossier"], request.language, request.option_code)
             mission["dossier"]["quote"] = quote.model_dump()
@@ -640,6 +915,8 @@ class ConversationService:
         text = request.message
         lower = text.lower()
         dossier = mission["dossier"]
+        if request.customer_name:
+            dossier["customer"]["name"] = request.customer_name
         if re.search(r"\bfemar\b", lower):
             dossier["customer"]["name"] = "FEMAR"
         generic_name = re.search(r"(?:cliente|customer)\s*[:\-]\s*([^\n,.]{2,80})", text, re.IGNORECASE)
@@ -719,6 +996,35 @@ class ConversationService:
         option_code: str,
     ) -> EditableQuote:
         base = self._quote_draft(dossier, language)
+        workspace = dossier.get("decision_workspace") or {}
+        alternative = next(
+            (item for item in workspace.get("alternatives", []) if item.get("code") == option_code),
+            None,
+        )
+        if alternative:
+            if alternative.get("status") != "approved":
+                raise ValueError("configuration_review_required")
+            configuration_lines = [
+                EditableQuoteLine(
+                    line_id=line["line_id"],
+                    description=line["description"],
+                    quantity=line["quantity"],
+                    unit_price=0,
+                    unit_cost=line["unit_cost"],
+                    sku=line.get("sku", ""),
+                    kind=line.get("kind", "equipment"),
+                    supplier_offer_id=line.get("source_offer_id", ""),
+                    price_source="unpriced",
+                )
+                for line in alternative.get("lines", [])
+            ]
+            lines = [base.lines[0], *configuration_lines, base.lines[-1]]
+            return EditableQuote(
+                status="needs_pricing",
+                lines=lines,
+                selected_option_code=option_code,
+                supplier_cost_total=round(sum(line.quantity * line.unit_cost for line in lines), 2),
+            )
         offer_lines: list[EditableQuoteLine] = []
         for offer in dossier.get("supplier_offers", []):
             for line in offer.get("lines", []):
@@ -747,7 +1053,9 @@ class ConversationService:
 
     def _refresh_options(self, mission: dict[str, Any]) -> None:
         dossier = mission["dossier"]
-        if not dossier.get("confirmed_scope"):
+        workspace = self._workspace(mission)
+        alternatives = {item.get("code"): item for item in workspace["alternatives"]}
+        if not dossier.get("confirmed_scope") and not alternatives:
             dossier["options"] = []
             return
         language = mission["language"]
@@ -759,6 +1067,40 @@ class ConversationService:
             ("B", "option_b", "option_b_summary"),
             ("C", "option_c", "option_c_summary"),
         ):
+            alternative = alternatives.get(code)
+            if alternative:
+                alt_status = alternative.get("status", "needs_validation")
+                status = {
+                    "draft": "needs_validation",
+                    "needs_validation": "needs_validation",
+                    "ready_for_review": "ready_for_review",
+                    "approved": "approved",
+                    "rejected": "needs_validation",
+                }[alt_status]
+                if selected == code and existing_quote.get("status") in {
+                    "draft",
+                    "approved",
+                    "delivered",
+                }:
+                    status = "ready"
+                evidence = {
+                    evidence_id
+                    for line in alternative.get("lines", [])
+                    for evidence_id in line.get("evidence_ids", [])
+                }
+                options.append(
+                    DossierOption(
+                        code=code,
+                        title=alternative.get("title") or TEXT[language][title_key],
+                        summary=alternative.get("objective") or TEXT[language][summary_key],
+                        status=status,
+                        line_ids=[line["line_id"] for line in alternative.get("lines", [])],
+                        supplier_cost_total=alternative.get("supplier_cost_total", 0),
+                        selling_total=existing_quote.get("total", 0) if selected == code else 0,
+                        evidence_count=len(evidence),
+                    ).model_dump()
+                )
+                continue
             related = []
             evidence = set()
             for offer in dossier.get("supplier_offers", []):
@@ -799,6 +1141,9 @@ class ConversationService:
             questions.append(TEXT[language]["question_existing"])
         if dossier["confirmed_scope"]:
             questions.append(TEXT[language]["question_schedule"])
+        for question in self._workspace(mission)["open_questions"]:
+            if question not in questions:
+                questions.append(question)
         dossier["questions"] = questions
 
     def _set_progress_and_phase(self, mission: dict[str, Any]) -> None:
@@ -812,6 +1157,9 @@ class ConversationService:
         score += 6 if dossier["attachments"] else 0
         score += 3 if dossier.get("extracted_evidence") else 0
         score += 4 if dossier.get("supplier_offers") else 0
+        workspace = self._workspace(mission)
+        score += 4 if workspace["requirements"] else 0
+        score += 5 if workspace["alternatives"] else 0
         score += 8 if dossier.get("quote") else 0
         dossier["progress"] = min(score, 90 if not dossier.get("quote") else 92)
         quote = dossier.get("quote") or {}
@@ -821,6 +1169,8 @@ class ConversationService:
             mission["phase"] = "approval"
         elif quote:
             mission["phase"] = "quote"
+        elif workspace["requirements"]:
+            mission["phase"] = "design"
         elif not dossier["customer"].get("identifier"):
             mission["phase"] = "identity"
         elif dossier["confirmed_scope"]:
@@ -839,6 +1189,8 @@ class ConversationService:
             return TEXT[language]["reply_approved"]
         if quote:
             return TEXT[language]["reply_quote"]
+        if self._workspace(mission)["requirements"]:
+            return TEXT[language]["reply_design"]
         if dossier["questions"]:
             return TEXT[language]["reply_progress"].format(questions=" ".join(dossier["questions"][:3]))
         return TEXT[language]["reply_ready"]
@@ -955,6 +1307,12 @@ class ConversationService:
         elif quote.get("status") == "draft":
             status = "awaiting_approval"
             next_action = TEXT[mission["language"]]["task_next_approval"]
+        elif self._workspace(mission)["requirements"] and not any(
+            item.get("status") == "approved"
+            for item in self._workspace(mission)["alternatives"]
+        ):
+            status = "needs_input"
+            next_action = TEXT[mission["language"]]["task_next_design"]
         elif dossier.get("confirmed_scope") and dossier["customer"].get("identifier"):
             status = "ready_for_quote"
             next_action = TEXT[mission["language"]]["task_next_quote"]
@@ -977,6 +1335,81 @@ class ConversationService:
         )
         if len(timeline) > 200:
             del timeline[:-200]
+
+    @staticmethod
+    def _requirement_key(category: str, text: str) -> str:
+        value = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+        return f"{category}:{re.sub(r'[^a-z0-9]+', '-', value.lower()).strip('-')}"
+
+    @staticmethod
+    def _workspace(mission: dict[str, Any]) -> dict[str, Any]:
+        dossier = mission.setdefault("dossier", {})
+        current = dossier.get("decision_workspace") or {}
+        normalized = DecisionWorkspace.model_validate(current).model_dump()
+        dossier["decision_workspace"] = normalized
+        return normalized
+
+    @staticmethod
+    def _refresh_decision_workspace(workspace: dict[str, Any]) -> None:
+        statuses = {item.get("status") for item in workspace.get("alternatives", [])}
+        if "approved" in statuses:
+            status = "approved"
+        elif "ready_for_review" in statuses:
+            status = "ready_for_review"
+        elif workspace.get("alternatives"):
+            status = "needs_validation"
+        elif workspace.get("requirements"):
+            status = "drafting_alternatives"
+        else:
+            status = "collecting_requirements"
+        workspace["status"] = status
+
+    @staticmethod
+    def _resolve_offer_line(
+        dossier: dict[str, Any],
+        offer_line_id: str,
+        sku: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        normalized_sku = sku.strip().lower()
+        for offer in dossier.get("supplier_offers", []):
+            for line in offer.get("lines", []):
+                if offer_line_id and line.get("line_id") == offer_line_id:
+                    candidates.append((offer, line))
+                elif not offer_line_id and normalized_sku and str(line.get("sku") or "").lower() == normalized_sku:
+                    candidates.append((offer, line))
+        if not offer_line_id and not normalized_sku:
+            raise ValueError("configuration_item_reference_required")
+        if not candidates:
+            raise ValueError("configuration_item_not_found")
+        if len(candidates) > 1:
+            raise ValueError("configuration_item_ambiguous")
+        offer, line = candidates[0]
+        if normalized_sku and str(line.get("sku") or "").lower() != normalized_sku:
+            raise ValueError("configuration_item_reference_mismatch")
+        rejected_draft_ids = {
+            item.get("catalog_draft_id")
+            for item in dossier.get("catalog_drafts", [])
+            if item.get("status") == "rejected"
+        }
+        if line.get("catalog_draft_id") in rejected_draft_ids:
+            raise ValueError("configuration_catalog_item_rejected")
+        return offer, line
+
+    @staticmethod
+    def _resolve_evidence(
+        dossier: dict[str, Any],
+        evidence_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        index = {
+            item.get("evidence_id"): item
+            for item in dossier.get("extracted_evidence", [])
+            if item.get("evidence_id")
+        }
+        missing = [evidence_id for evidence_id in evidence_ids if evidence_id not in index]
+        if missing:
+            raise ValueError("configuration_evidence_not_found")
+        return [index[evidence_id] for evidence_id in evidence_ids]
 
     def _catalog_index(self, mission: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
         """Read known catalog items without turning an unavailable source into a match."""
