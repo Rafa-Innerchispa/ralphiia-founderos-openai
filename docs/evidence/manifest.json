@@ -7,6 +7,26 @@
   },
   "commits": [
     {
+      "commit": "676addf",
+      "date": "2026-07-14",
+      "files": [
+        ".gitignore",
+        "README.md",
+        "docs/BASELINE_PRE_HACKATHON.md",
+        "docs/BUILD_WEEK_CHANGES.md",
+        "docs/CODEX_SESSION.md",
+        "docs/H1.md",
+        "main.py",
+        "quoteops/__init__.py",
+        "quoteops/app.py",
+        "quoteops/contracts.py",
+        "quoteops/settings.py",
+        "requirements.txt"
+      ],
+      "kind": "measured",
+      "subject": "H1 scaffold for QuoteOps"
+    },
+    {
       "commit": "7a01150",
       "date": "2026-07-14",
       "files": [
@@ -458,8 +478,9 @@
     "kind": "pending"
   },
   "generated_from": {
-    "canonical_base": "16e1aaf",
-    "kind": "measured"
+    "functional_source_ref": "16e1aaf",
+    "kind": "measured",
+    "policy": "newest reachable commit with a non-evidence file change"
   },
   "observable_tests": {
     "kind": "derived",

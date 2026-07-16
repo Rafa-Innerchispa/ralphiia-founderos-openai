@@ -21,11 +21,41 @@ SENSITIVE_PATTERNS = (
     re.compile(r"(?i)bearer\s+[a-z0-9._-]+"),
     re.compile(r"\b(?:sk|rk|ghp)_[A-Za-z0-9_-]{8,}\b"),
     re.compile(r"[A-Za-z]:\\"),
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+    re.compile(r"\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b"),
+    re.compile(r"(?<![\w.-])/home/[^\s\"'<>]+"),
+    re.compile(r"(?<!\d)\d{10}(?!\d)"),
+    re.compile(r"(?<!\d)\d{13}(?!\d)"),
+    re.compile(r"(?<!\d)\d{9,15}(?!\d)"),
+)
+EVIDENCE_PATHS = (
+    "scripts/build_evidence_report.py",
+    "tests/test_build_evidence_report.py",
+    "docs/BUILD_EVIDENCE.md",
+    "docs/CODEX_BUILD_LOG.md",
+    "docs/evidence/",
 )
 
 
 def _git(repo: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
+
+
+def _commit_files(repo: Path, revision: str) -> list[str]:
+    return _git(repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", revision).splitlines()
+
+
+def _is_evidence_path(path: str) -> bool:
+    return path in EVIDENCE_PATHS[:-1] or path.startswith(EVIDENCE_PATHS[-1])
+
+
+def source_revision(repo: Path) -> str:
+    """Find the newest commit with a non-evidence change reachable from HEAD."""
+    for revision in _git(repo, "rev-list", "HEAD").splitlines():
+        files = _commit_files(repo, revision)
+        if any(not _is_evidence_path(path) for path in files):
+            return revision
+    raise ValueError("no functional/non-evidence commit found")
 
 
 def assert_safe(value: Any) -> None:
@@ -43,13 +73,13 @@ def redact(text: str) -> str:
     return text
 
 
-def build_week_commits(repo: Path) -> list[dict[str, Any]]:
+def build_week_commits(repo: Path, source_ref: str) -> list[dict[str, Any]]:
     """Return reachable commits that have Build Week documentation or QuoteOps changes."""
-    rows = _git(repo, "log", "--reverse", "--format=%H%x1f%h%x1f%ad%x1f%s", "--date=short", "main").splitlines()
+    rows = _git(repo, "log", "--reverse", "--format=%H%x1f%h%x1f%ad%x1f%s", "--date=short", source_ref).splitlines()
     commits: list[dict[str, Any]] = []
     for row in rows:
         full, short, date, subject = row.split("\x1f", 3)
-        files = _git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", full).splitlines()
+        files = _commit_files(repo, full)
         # The isolated Build Week work began with its public documentation;
         # later QuoteOps commits are included when their file list is relevant.
         if not any(name.startswith(("quoteops/", "tests/", "docs/", "main.py")) for name in files):
@@ -85,12 +115,15 @@ def public_progress(repo: Path) -> dict[str, Any]:
 
 
 def build_manifest(repo: Path) -> dict[str, Any]:
-    commits = build_week_commits(repo)
+    source_ref = source_revision(repo)
+    commits = build_week_commits(repo, source_ref)
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        # The canonical base is stable across a report-only branch and avoids
-        # a self-referential manifest that changes after its own commit.
-        "generated_from": {"kind": "measured", "canonical_base": _git(repo, "rev-parse", "--short", "main")},
+        "generated_from": {
+            "kind": "measured",
+            "functional_source_ref": _git(repo, "rev-parse", "--short", source_ref),
+            "policy": "newest reachable commit with a non-evidence file change",
+        },
         "scope": {
             "kind": "derived",
             "name": "QuoteOps Build Week",
