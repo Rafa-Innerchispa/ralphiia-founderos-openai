@@ -12,7 +12,7 @@
 - Current status: multibusiness project profiles are verified on canonical staging `:8765`; 57/57 full-host tests pass, FEMAR remains isolated, a photography-workshop mission now has its own bilingual questions and editable zero-price quote, and no production writes occurred
 - Baseline commit: `efa08e5`
 - Current increment base: `a265c05`
-- Current canonical HEAD: `6389879`
+- Current functional commits: `b1d8d57` (project profiles) and `6389879` (bilingual quote lines)
 
 ## Coordination
 
