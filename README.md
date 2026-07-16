@@ -9,8 +9,10 @@ QuoteOps turns a natural-language project conversation into a verified, editable
 3. Validate a 10-digit Ecuadorian cédula locally or a 13-digit RUC through authorized Intuito access.
 4. Reconcile the identity read-only against RalphiIA and Contífico to avoid duplicates.
 5. Review site, confirmed scope, assumptions, risks, questions, and technical options.
-6. Prepare an editable quote whose prices start at zero.
-7. Enter real commercial values, obtain human approval, generate a real PDF, and register delivery.
+6. Let ChatGPT extract structured, reviewable evidence from images, PDFs, product labels, and supplier price lists through MCP.
+7. Compare three packages: selective rehabilitation, hybrid modernization, and full renewal.
+8. Prepare an editable quote whose selling prices start at zero while verified supplier costs remain internal.
+9. Enter real commercial values, obtain human approval, generate a real PDF, and register delivery.
 
 The first supported real case is FEMAR's access-control replacement or rehabilitation project. The interface works in Spanish and English on mobile and desktop, and its translation catalog can be extended with additional locales.
 
@@ -28,6 +30,8 @@ GPT-5.6 evidence for Build Week is captured by the Codex development sessions, c
 - Smart Quoter `:2026` diagnosis/refinement through a read-only adapter.
 - MongoDB staging mission, identity, approval, and delivery records.
 - Local PDF artifact generation after human approval.
+- A staging MCP JSON-RPC surface with typed mission, multimodal evidence, supplier-cost, package, pricing, approval, and delivery tools.
+- Read-only exact SKU/name reconciliation before any staging catalog draft is created, plus explicit human approval for genuinely new items.
 
 The side panel shows source, call, status, latency, observation time, and a sanitized result for each integration. Credentials and raw sensitive provider responses are not exposed.
 
@@ -74,12 +78,22 @@ QUOTEOPS_PORT=8765 .venv/bin/python main.py
 - `POST /api/conversation/messages`
 - `GET /api/conversation/missions/{mission_id}`
 - `POST /api/conversation/missions/{mission_id}/attachments`
+- `POST /api/conversation/missions/{mission_id}/evidence/extractions`
+- `POST /api/conversation/missions/{mission_id}/evidence/{evidence_id}/review`
+- `POST /api/conversation/missions/{mission_id}/supplier-offers`
+- `POST /api/conversation/missions/{mission_id}/catalog-drafts/{catalog_draft_id}/review`
+- `POST /api/conversation/missions/{mission_id}/packages/select`
 - `PUT /api/conversation/missions/{mission_id}/quote`
 - `POST /api/conversation/missions/{mission_id}/approve`
 - `POST /api/conversation/missions/{mission_id}/deliver`
 - `POST /api/customer/lookup`
 - `POST /api/ruc/lookup`
 - `POST /api/ruc/confirm`
+- `GET /api/mcp/tools`
+- `POST /api/mcp/call`
+- `POST /mcp`
+
+The QuoteOps MCP surface is staged but is not routed through the shared production MCP gateway. See `docs/MCP_CHATGPT_RUNBOOK.md` for the activation boundary and the exact ChatGPT flow.
 
 Legacy intake, channel, operations, Smart Quoter, IESS, approval, PDF, and delivery endpoints remain available for existing integrations.
 

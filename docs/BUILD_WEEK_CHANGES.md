@@ -31,3 +31,16 @@
 - Reduced integration visibility to name and status only in the public projection; internal sources, calls, latency, results, customer data, documents, and identifiers remain private.
 - Added defensive redaction for Ecuadorian identifiers, IP addresses, local paths, and secret-like values.
 - Added stable revisions and a 15-second refresh hint so a static Astro site can update without rebuilding.
+
+## FEMAR end-to-end and ChatGPT MCP
+
+- Added a real work item per conversation mission with deterministic IDs, status, next action, source channel, and a bounded timeline.
+- Expanded the FEMAR proposal into three packages: selective rehabilitation, hybrid modernization, and full renewal.
+- Added typed multimodal evidence contracts so ChatGPT can persist facts, product candidates, and supplier prices extracted from images, PDFs, product labels, site photos, and price lists.
+- Added explicit source linkage, SHA-256 provenance when the original is stored, confidence, page/region, warnings, review status, and human confirmation/rejection.
+- Added idempotent supplier offers with exact costs, source reference, optional stored attachment evidence, package assignment, and staging-only catalog drafts.
+- Added read-only exact catalog reconciliation so known SKUs are linked, while unknown products and services require explicit human approval into the isolated staging catalog.
+- Kept supplier cost separate from selling price. Selecting a package never copies cost into the customer price; selling values remain zero until entered by a human.
+- Expanded the generated PDF to include selected package, quote lines, subtotal, tax, and total while intentionally excluding internal supplier costs.
+- Added a typed staging MCP surface for mission, evidence, supplier offer, package, quote, approval, and delivery operations. It exposes no shell, arbitrary Mongo query, or generic URL execution.
+- Preserved the production boundary: the shared RalphiIA MCP service and gateway were audited read-only and were not restarted or modified.

@@ -13,6 +13,7 @@ class Settings(BaseModel):
     env: str = os.getenv("QUOTEOPS_ENV", "dev")
     mongo_uri: str = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017/")
     ralfia_api_base: str = os.getenv("RALFIA_API_BASE", "http://127.0.0.1:8099")
+    ralfia_ops_base_url: str = os.getenv("RALFIA_OPS_BASE_URL", "http://127.0.0.1:2002")
     smart_quoter_base_url: str = os.getenv("SMART_QUOTER_BASE_URL", "http://127.0.0.1:2026")
     ralfia_mcp_url: str = os.getenv("RALFIA_MCP_URL", "http://127.0.0.1:8102/mcp")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.6")
@@ -37,6 +38,7 @@ class Settings(BaseModel):
     quoteops_mongo_db: str = os.getenv("QUOTEOPS_MONGO_DB", "ralphiia_quoteops_staging")
     quoteops_artifact_root: str = os.getenv("QUOTEOPS_ARTIFACT_ROOT", "/tmp/ralphiia-quoteops-artifacts")
     quoteops_webhook_secret: str = os.getenv("QUOTEOPS_WEBHOOK_SECRET", "")
+    quoteops_mcp_api_key: str = os.getenv("QUOTEOPS_MCP_API_KEY", "")
     iess_evidence_root: str = os.getenv("IESS_EVIDENCE_ROOT", "/home/rlopez/data/ralphiia-quoteops/iess-evidence")
     ralfia_package_root: str = os.getenv(
         "RALFIA_PACKAGE_ROOT", "/home/rlopez/projects/raphiia-openai"

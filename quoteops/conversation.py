@@ -6,12 +6,15 @@ from hashlib import sha256
 import re
 from threading import RLock
 from typing import Any
+import unicodedata
 
+import httpx
 from pymongo import MongoClient
 
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize_ec_identifier
 from quoteops.contracts import (
     ContextDossier,
+    CatalogDraftReviewRequest,
     ConversationMessageRequest,
     ConversationReply,
     DossierCustomer,
@@ -19,9 +22,15 @@ from quoteops.contracts import (
     DossierSite,
     EditableQuote,
     EditableQuoteLine,
+    EvidenceReviewRequest,
     MissionApprovalRequest,
     MissionDeliveryRequest,
+    MultimodalEvidence,
+    MultimodalEvidenceCreateRequest,
+    PackageSelectionRequest,
     QuoteUpdateRequest,
+    SupplierOffer,
+    SupplierOfferCreateRequest,
 )
 
 
@@ -32,8 +41,10 @@ TEXT = {
         "risk": "La compatibilidad del sistema existente debe verificarse en sitio.",
         "option_a": "Rehabilitación selectiva",
         "option_a_summary": "Conservar componentes compatibles y sustituir únicamente los puntos críticos.",
-        "option_b": "Renovación integral",
-        "option_b_summary": "Diseñar una plataforma nueva con migración controlada del sistema actual.",
+        "option_b": "Modernización híbrida",
+        "option_b_summary": "Combinar componentes compatibles con una modernización controlada de los puntos prioritarios.",
+        "option_c": "Renovación integral",
+        "option_c_summary": "Diseñar una plataforma nueva con migración controlada del sistema actual.",
         "question_customer": "¿Cuál es la cédula o RUC del cliente?",
         "question_site": "¿Dónde está el sitio y cuántos accesos o puertas incluye?",
         "question_existing": "¿Qué marca, modelo y estado tiene el sistema actual?",
@@ -43,6 +54,11 @@ TEXT = {
         "reply_quote": "Preparé un borrador editable sin inventar precios. Completa los valores reales antes de enviarlo a aprobación.",
         "reply_approved": "La aprobación humana quedó registrada y el PDF real está listo.",
         "reply_delivered": "La entrega quedó registrada con su identificador y trazabilidad.",
+        "task_next_input": "Completar identidad, sitio, alcance y evidencia de costos.",
+        "task_next_quote": "Seleccionar un paquete y confirmar precios de venta.",
+        "task_next_approval": "Revisar la cotización y registrar aprobación humana.",
+        "task_next_delivery": "Registrar la entrega aprobada.",
+        "task_done": "Entrega registrada.",
     },
     "en": {
         "scope": "Replace or rehabilitate the access-control system",
@@ -50,8 +66,10 @@ TEXT = {
         "risk": "Compatibility with the existing system must be verified on site.",
         "option_a": "Selective rehabilitation",
         "option_a_summary": "Keep compatible components and replace only critical access points.",
-        "option_b": "Full renewal",
-        "option_b_summary": "Design a new platform with a controlled migration from the current system.",
+        "option_b": "Hybrid modernization",
+        "option_b_summary": "Combine compatible components with a controlled modernization of priority access points.",
+        "option_c": "Full renewal",
+        "option_c_summary": "Design a new platform with a controlled migration from the current system.",
         "question_customer": "What is the customer's national ID or RUC?",
         "question_site": "Where is the site and how many doors or access points are included?",
         "question_existing": "What are the brand, model, and condition of the current system?",
@@ -61,6 +79,11 @@ TEXT = {
         "reply_quote": "I prepared an editable draft without inventing prices. Enter the real values before human approval.",
         "reply_approved": "Human approval was recorded and the real PDF is ready.",
         "reply_delivered": "Delivery was registered with its identifier and trace.",
+        "task_next_input": "Complete identity, site, scope, and cost evidence.",
+        "task_next_quote": "Select a package and confirm selling prices.",
+        "task_next_approval": "Review the quote and record human approval.",
+        "task_next_delivery": "Register delivery of the approved quote.",
+        "task_done": "Delivery registered.",
     },
 }
 
@@ -81,6 +104,8 @@ class ConversationService:
         self.mongo_client = None
         self.collection = None
         self.operations = None
+        self.tasks = None
+        self.catalog = None
         if persist:
             self._connect_mongo()
 
@@ -96,8 +121,12 @@ class ConversationService:
             db = client[self.settings.quoteops_mongo_db]
             self.collection = db["conversation_missions"]
             self.operations = db["conversation_operations"]
+            self.tasks = db["conversation_tasks"]
+            self.catalog = db["conversation_catalog"]
             self.collection.create_index("mission_id", unique=True)
             self.operations.create_index("idempotency_key", unique=True)
+            self.tasks.create_index("task_id", unique=True)
+            self.catalog.create_index("canonical_item_id", unique=True)
             self.mongo_client = client
         except Exception:
             if client is not None:
@@ -120,6 +149,8 @@ class ConversationService:
             mission_id = request.mission_id or self._mission_id(request.idempotency_key)
             mission = self._load_mission(mission_id) or self._new_mission(mission_id, request.language)
             mission["language"] = request.language
+            if mission["dossier"].get("work_item"):
+                mission["dossier"]["work_item"]["source_channel"] = request.source_channel
             mission["messages"].append(
                 {
                     "role": "user",
@@ -128,6 +159,7 @@ class ConversationService:
                     "at": self._now(),
                 }
             )
+            self._add_event(mission, "message_received", "Conversation input recorded")
             self._apply_message(mission, request)
             reply = self._reply(mission)
             mission["messages"].append({"role": "assistant", "text": reply, "at": self._now()})
@@ -144,6 +176,8 @@ class ConversationService:
             if language in TEXT:
                 mission["language"] = language
                 self._refresh_questions(mission)
+                self._refresh_options(mission)
+                self._sync_work_item(mission)
             reply = self._reply(mission)
             return ConversationReply.model_validate(self._response(mission, reply))
 
@@ -154,22 +188,324 @@ class ConversationService:
                 replay["idempotent_replay"] = True
                 return ConversationReply.model_validate(replay)
             mission = self._require_mission(mission_id)
-            subtotal = round(sum(line.quantity * line.unit_price for line in request.lines), 2)
+            current = EditableQuote.model_validate(mission["dossier"].get("quote") or {})
+            previous = {line.line_id: line for line in current.lines}
+            merged_lines: list[EditableQuoteLine] = []
+            for line in request.lines:
+                old = previous.get(line.line_id)
+                merged_lines.append(
+                    line.model_copy(
+                        update={
+                            "unit_cost": old.unit_cost if old and not line.unit_cost else line.unit_cost,
+                            "sku": line.sku or (old.sku if old else ""),
+                            "kind": line.kind or (old.kind if old else ""),
+                            "supplier_offer_id": line.supplier_offer_id or (old.supplier_offer_id if old else ""),
+                            "price_source": "human_entered" if line.unit_price > 0 else "unpriced",
+                        }
+                    )
+                )
+            subtotal = round(sum(line.quantity * line.unit_price for line in merged_lines), 2)
             tax = round(subtotal * request.tax_rate, 2)
             quote = EditableQuote(
-                status="draft" if subtotal > 0 and all(line.unit_price > 0 for line in request.lines) else "needs_pricing",
-                lines=request.lines,
+                status="draft" if subtotal > 0 and all(line.unit_price > 0 for line in merged_lines) else "needs_pricing",
+                lines=merged_lines,
                 subtotal=subtotal,
                 tax=tax,
                 total=round(subtotal + tax, 2),
+                selected_option_code=current.selected_option_code,
+                supplier_cost_total=round(sum(line.quantity * line.unit_cost for line in merged_lines), 2),
             )
             mission["language"] = request.language
             mission["dossier"]["quote"] = quote.model_dump()
             mission["phase"] = "quote"
             mission["dossier"]["progress"] = max(mission["dossier"]["progress"], 82)
+            self._add_event(mission, "quote_priced", "Selling prices updated by a human")
+            self._refresh_options(mission)
+            self._sync_work_item(mission)
             self._save_mission(mission)
             response = self._response(mission, self._reply(mission))
             self._save_operation(request.idempotency_key, mission_id, "quote_update", response)
+            return ConversationReply.model_validate(response)
+
+    def add_supplier_offer(
+        self,
+        mission_id: str,
+        request: SupplierOfferCreateRequest,
+    ) -> dict[str, Any]:
+        """Record exact supplier costs and create staging-only catalog drafts."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            offer_id = "offer_" + sha256(request.idempotency_key.encode()).hexdigest()[:18]
+            if request.attachment_storage_id or request.attachment_sha256:
+                evidence = mission["dossier"].get("attachments", [])
+                matched = any(
+                    (not request.attachment_storage_id or item.get("storage_id") == request.attachment_storage_id)
+                    and (not request.attachment_sha256 or item.get("sha256") == request.attachment_sha256)
+                    for item in evidence
+                )
+                if not matched:
+                    raise ValueError("attachment_evidence_not_found")
+            lines = []
+            catalog_drafts = mission["dossier"].setdefault("catalog_drafts", [])
+            catalog_index, catalog_lookup = self._catalog_index(mission)
+            for index, raw in enumerate(request.lines):
+                seed = f"{offer_id}:{index}:{raw.sku}:{raw.description}"
+                line_id = "offerline_" + sha256(seed.encode()).hexdigest()[:16]
+                catalog_key = self._catalog_key(raw.sku, raw.description)
+                canonical = self._find_catalog_match(catalog_index, raw.sku, raw.description)
+                draft = next(
+                    (item for item in catalog_drafts if item.get("catalog_key") == catalog_key),
+                    None,
+                )
+                if canonical is None and draft is None:
+                    draft = {
+                        "catalog_draft_id": "catalogdraft_" + sha256(catalog_key.encode()).hexdigest()[:18],
+                        "catalog_key": catalog_key,
+                        "sku": raw.sku,
+                        "name": raw.description,
+                        "kind": raw.kind,
+                        "unit": raw.unit,
+                        "status": "draft",
+                        "source_offer_id": offer_id,
+                        "source_line_id": line_id,
+                        "canonical_item_id": "",
+                        "approval_required": True,
+                    }
+                    catalog_drafts.append(draft)
+                line_cost = round(raw.quantity * raw.unit_cost, 2)
+                lines.append(
+                    {
+                        "line_id": line_id,
+                        "sku": raw.sku,
+                        "description": raw.description,
+                        "kind": raw.kind,
+                        "quantity": raw.quantity,
+                        "unit": raw.unit,
+                        "unit_cost": raw.unit_cost,
+                        "line_cost": line_cost,
+                        "package_codes": list(dict.fromkeys(raw.package_codes)),
+                        "catalog_draft_id": draft["catalog_draft_id"] if draft else "",
+                        "canonical_item_id": self._canonical_item_id(canonical),
+                    }
+                )
+            evidence_status = "reference"
+            if request.attachment_sha256:
+                evidence_status = "reference_and_attachment" if request.supplier_reference else "attachment"
+            offer = SupplierOffer(
+                offer_id=offer_id,
+                supplier_name=request.supplier_name,
+                supplier_reference=request.supplier_reference,
+                currency=request.currency,
+                tax_included=request.tax_included,
+                effective_at=request.effective_at,
+                valid_until=request.valid_until,
+                attachment_storage_id=request.attachment_storage_id,
+                attachment_sha256=request.attachment_sha256,
+                notes=request.notes,
+                total_cost=round(sum(item["line_cost"] for item in lines), 2),
+                evidence_status=evidence_status,
+                lines=lines,
+            ).model_dump()
+            mission["language"] = request.language
+            mission["dossier"].setdefault("supplier_offers", []).append(offer)
+            self._add_event(mission, "supplier_offer_added", f"Supplier evidence {offer_id} recorded")
+            self._refresh_options(mission)
+            self._set_progress_and_phase(mission)
+            self._save_mission(mission)
+            response = {
+                **self._response(mission, self._reply(mission)),
+                "supplier_offer": offer,
+                "catalog_drafts_created": [
+                    item for item in catalog_drafts if item.get("source_offer_id") == offer_id
+                ],
+                "catalog_lookup": catalog_lookup,
+            }
+            self._save_operation(request.idempotency_key, mission_id, "supplier_offer", response)
+            return response
+
+    def record_extracted_evidence(
+        self,
+        mission_id: str,
+        request: MultimodalEvidenceCreateRequest,
+    ) -> dict[str, Any]:
+        """Persist model-extracted facts without treating them as confirmed business data."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            attachments = mission["dossier"].get("attachments", [])
+            linked = False
+            if request.source_attachment_id or request.source_sha256:
+                linked = any(
+                    (not request.source_attachment_id or item.get("storage_id") == request.source_attachment_id)
+                    and (not request.source_sha256 or item.get("sha256") == request.source_sha256)
+                    for item in attachments
+                )
+                if not linked:
+                    raise ValueError("attachment_evidence_not_found")
+            evidence_id = "evidence_" + sha256(request.idempotency_key.encode()).hexdigest()[:18]
+            evidence = MultimodalEvidence(
+                evidence_id=evidence_id,
+                source_file_name=request.source_file_name,
+                media_type=request.media_type,
+                source_attachment_id=request.source_attachment_id,
+                source_sha256=request.source_sha256,
+                extraction_type=request.extraction_type,
+                extracted_by=request.extracted_by,
+                extracted_text=request.extracted_text,
+                facts=request.facts,
+                products=request.products,
+                supplier_prices=request.supplier_prices,
+                warnings=(
+                    list(request.warnings)
+                    if linked
+                    else [*request.warnings, "original_source_not_archived"]
+                ),
+                status="needs_review" if linked else "source_unlinked",
+                extracted_at=self._now(),
+            ).model_dump()
+            mission["language"] = request.language
+            mission["dossier"].setdefault("extracted_evidence", []).append(evidence)
+            self._add_event(mission, "evidence_extracted", f"Structured evidence {evidence_id} recorded")
+            self._set_progress_and_phase(mission)
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "evidence": evidence}
+            self._save_operation(request.idempotency_key, mission_id, "evidence_extract", response)
+            return response
+
+    def review_extracted_evidence(
+        self,
+        mission_id: str,
+        evidence_id: str,
+        request: EvidenceReviewRequest,
+    ) -> dict[str, Any]:
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            evidence = next(
+                (
+                    item
+                    for item in mission["dossier"].get("extracted_evidence", [])
+                    if item.get("evidence_id") == evidence_id
+                ),
+                None,
+            )
+            if evidence is None:
+                raise ValueError("evidence_not_found")
+            evidence.update(
+                {
+                    "status": "confirmed" if request.decision == "confirm" else "rejected",
+                    "reviewed_by": request.reviewed_by,
+                    "review_notes": request.notes,
+                }
+            )
+            mission["language"] = request.language
+            self._add_event(mission, "evidence_reviewed", f"Evidence {evidence_id} {evidence['status']}")
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "evidence": evidence}
+            self._save_operation(request.idempotency_key, mission_id, "evidence_review", response)
+            return response
+
+    def review_catalog_draft(
+        self,
+        mission_id: str,
+        catalog_draft_id: str,
+        request: CatalogDraftReviewRequest,
+    ) -> dict[str, Any]:
+        """Approve a new item only inside the isolated QuoteOps staging catalog."""
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                return {**replay, "idempotent_replay": True}
+            mission = self._require_mission(mission_id)
+            draft = next(
+                (
+                    item
+                    for item in mission["dossier"].get("catalog_drafts", [])
+                    if item.get("catalog_draft_id") == catalog_draft_id
+                ),
+                None,
+            )
+            if draft is None:
+                raise ValueError("catalog_draft_not_found")
+            if request.decision == "approve":
+                canonical_item_id = draft.get("canonical_item_id") or (
+                    "catalogitem_" + sha256(catalog_draft_id.encode()).hexdigest()[:18]
+                )
+                draft.update(
+                    {
+                        "status": "approved_staging",
+                        "canonical_item_id": canonical_item_id,
+                        "approval_required": False,
+                        "reviewed_by": request.reviewed_by,
+                        "review_notes": request.notes,
+                    }
+                )
+                for offer in mission["dossier"].get("supplier_offers", []):
+                    for line in offer.get("lines", []):
+                        if line.get("catalog_draft_id") == catalog_draft_id:
+                            line["canonical_item_id"] = canonical_item_id
+                if self.catalog is not None:
+                    self.catalog.replace_one(
+                        {"canonical_item_id": canonical_item_id},
+                        {
+                            "canonical_item_id": canonical_item_id,
+                            "sku": draft.get("sku", ""),
+                            "name": draft.get("name", ""),
+                            "kind": draft.get("kind", "equipment"),
+                            "unit": draft.get("unit", "unit"),
+                            "source_mission_id": mission_id,
+                            "source_offer_id": draft.get("source_offer_id", ""),
+                            "approved_by": request.reviewed_by,
+                            "created_at": self._now(),
+                            "persistence_target": "quoteops_staging",
+                        },
+                        upsert=True,
+                    )
+            else:
+                draft.update(
+                    {
+                        "status": "rejected",
+                        "approval_required": False,
+                        "reviewed_by": request.reviewed_by,
+                        "review_notes": request.notes,
+                    }
+                )
+            mission["language"] = request.language
+            self._add_event(mission, "catalog_reviewed", f"Catalog draft {catalog_draft_id} {draft['status']}")
+            self._save_mission(mission)
+            response = {**self._response(mission, self._reply(mission)), "catalog_draft": draft}
+            self._save_operation(request.idempotency_key, mission_id, "catalog_review", response)
+            return response
+
+    def select_package(
+        self,
+        mission_id: str,
+        request: PackageSelectionRequest,
+    ) -> ConversationReply:
+        with self._lock:
+            replay = self._cached_operation(request.idempotency_key)
+            if replay:
+                replay["idempotent_replay"] = True
+                return ConversationReply.model_validate(replay)
+            mission = self._require_mission(mission_id)
+            mission["language"] = request.language
+            quote = self._quote_for_package(mission["dossier"], request.language, request.option_code)
+            mission["dossier"]["quote"] = quote.model_dump()
+            mission["phase"] = "quote"
+            mission["dossier"]["progress"] = max(mission["dossier"].get("progress", 0), 82)
+            self._add_event(mission, "package_selected", f"Package {request.option_code} selected")
+            self._refresh_options(mission)
+            self._sync_work_item(mission)
+            self._save_mission(mission)
+            response = self._response(mission, self._reply(mission))
+            self._save_operation(request.idempotency_key, mission_id, "package_select", response)
             return ConversationReply.model_validate(response)
 
     def approve(self, mission_id: str, request: MissionApprovalRequest, execution_service) -> dict[str, Any]:
@@ -198,6 +534,7 @@ class ConversationService:
                     },
                     "approved_by": request.approved_by,
                     "mode": request.access_mode,
+                    "quote": quote.model_dump(),
                 }
             )
             if result.get("status") != "approved":
@@ -210,6 +547,8 @@ class ConversationService:
             mission["phase"] = "approval"
             mission["dossier"]["quote"] = quote.model_dump()
             mission["dossier"]["progress"] = 94
+            self._add_event(mission, "quote_approved", f"Human approval {result['approval_id']} recorded")
+            self._sync_work_item(mission)
             mission["messages"].append(
                 {"role": "assistant", "text": TEXT[request.language]["reply_approved"], "at": self._now()}
             )
@@ -242,6 +581,8 @@ class ConversationService:
             mission["phase"] = "delivery"
             mission["dossier"]["quote"] = quote.model_dump()
             mission["dossier"]["progress"] = 100
+            self._add_event(mission, "delivery_registered", f"Delivery {result['delivery_id']} registered")
+            self._sync_work_item(mission)
             mission["messages"].append(
                 {"role": "assistant", "text": TEXT[request.language]["reply_delivered"], "at": self._now()}
             )
@@ -275,6 +616,7 @@ class ConversationService:
                     "source": source,
                 }
             )
+            self._add_event(mission, "customer_verified", f"Identity verified through {source}")
             self._refresh_questions(mission)
             self._set_progress_and_phase(mission)
             self._save_mission(mission)
@@ -289,6 +631,7 @@ class ConversationService:
                 existing.update(attachment)
             else:
                 items.append(attachment)
+            self._add_event(mission, "attachment_stored", f"Attachment {attachment.get('storage_id') or attachment.get('name')} stored")
             self._set_progress_and_phase(mission)
             self._save_mission(mission)
             return ConversationReply.model_validate(self._response(mission, self._reply(mission)))
@@ -346,10 +689,8 @@ class ConversationService:
                 dossier["attachments"].append(attachment.model_dump())
                 existing_names.add(attachment.name)
 
-        dossier["options"] = [
-            DossierOption(code="A", title=TEXT[request.language]["option_a"], summary=TEXT[request.language]["option_a_summary"]).model_dump(),
-            DossierOption(code="B", title=TEXT[request.language]["option_b"], summary=TEXT[request.language]["option_b_summary"]).model_dump(),
-        ] if dossier["confirmed_scope"] else []
+        if dossier["confirmed_scope"]:
+            self._refresh_options(mission)
         if any(word in lower for word in ("cotiz", "borrador", "quote", "proposal")) and dossier["confirmed_scope"]:
             dossier["quote"] = dossier.get("quote") or self._quote_draft(dossier, request.language).model_dump()
         self._refresh_questions(mission)
@@ -370,6 +711,81 @@ class ConversationService:
                 EditableQuoteLine(line_id="implementation", description=descriptions[2], quantity=1, unit_price=0),
             ],
         )
+
+    def _quote_for_package(
+        self,
+        dossier: dict[str, Any],
+        language: str,
+        option_code: str,
+    ) -> EditableQuote:
+        base = self._quote_draft(dossier, language)
+        offer_lines: list[EditableQuoteLine] = []
+        for offer in dossier.get("supplier_offers", []):
+            for line in offer.get("lines", []):
+                if option_code not in line.get("package_codes", []):
+                    continue
+                offer_lines.append(
+                    EditableQuoteLine(
+                        line_id=line["line_id"],
+                        description=line["description"],
+                        quantity=line["quantity"],
+                        unit_price=0,
+                        unit_cost=line["unit_cost"],
+                        sku=line.get("sku", ""),
+                        kind=line.get("kind", "equipment"),
+                        supplier_offer_id=offer["offer_id"],
+                        price_source="unpriced",
+                    )
+                )
+        lines = [base.lines[0], *offer_lines, base.lines[-1]] if offer_lines else base.lines
+        return EditableQuote(
+            status="needs_pricing",
+            lines=lines,
+            selected_option_code=option_code,
+            supplier_cost_total=round(sum(line.quantity * line.unit_cost for line in lines), 2),
+        )
+
+    def _refresh_options(self, mission: dict[str, Any]) -> None:
+        dossier = mission["dossier"]
+        if not dossier.get("confirmed_scope"):
+            dossier["options"] = []
+            return
+        language = mission["language"]
+        existing_quote = dossier.get("quote") or {}
+        selected = existing_quote.get("selected_option_code", "")
+        options = []
+        for code, title_key, summary_key in (
+            ("A", "option_a", "option_a_summary"),
+            ("B", "option_b", "option_b_summary"),
+            ("C", "option_c", "option_c_summary"),
+        ):
+            related = []
+            evidence = set()
+            for offer in dossier.get("supplier_offers", []):
+                for line in offer.get("lines", []):
+                    if code in line.get("package_codes", []):
+                        related.append(line)
+                        evidence.add(offer.get("offer_id"))
+            selling_total = existing_quote.get("total", 0) if selected == code else 0
+            if selected == code and existing_quote.get("status") in {"draft", "approved", "delivered"}:
+                status = "ready"
+            elif related:
+                status = "needs_pricing"
+            else:
+                status = "needs_costs"
+            options.append(
+                DossierOption(
+                    code=code,
+                    title=TEXT[language][title_key],
+                    summary=TEXT[language][summary_key],
+                    status=status,
+                    line_ids=[line["line_id"] for line in related],
+                    supplier_cost_total=round(sum(line["line_cost"] for line in related), 2),
+                    selling_total=selling_total,
+                    evidence_count=len(evidence),
+                ).model_dump()
+            )
+        dossier["options"] = options
 
     def _refresh_questions(self, mission: dict[str, Any]) -> None:
         language = mission["language"]
@@ -394,6 +810,8 @@ class ConversationService:
         score += 14 if dossier["site"].get("location") else 0
         score += 12 if dossier["site"].get("access_points") else 0
         score += 6 if dossier["attachments"] else 0
+        score += 3 if dossier.get("extracted_evidence") else 0
+        score += 4 if dossier.get("supplier_offers") else 0
         score += 8 if dossier.get("quote") else 0
         dossier["progress"] = min(score, 90 if not dossier.get("quote") else 92)
         quote = dossier.get("quote") or {}
@@ -409,6 +827,7 @@ class ConversationService:
             mission["phase"] = "scope"
         else:
             mission["phase"] = "discovery"
+        self._sync_work_item(mission)
 
     def _reply(self, mission: dict[str, Any]) -> str:
         language = mission["language"]
@@ -440,7 +859,9 @@ class ConversationService:
         ).model_dump()
 
     def _new_mission(self, mission_id: str, language: str) -> dict[str, Any]:
-        return {
+        now = self._now()
+        task_id = "task_" + sha256(mission_id.encode()).hexdigest()[:18]
+        mission = {
             "mission_id": mission_id,
             "language": language,
             "phase": "discovery",
@@ -448,11 +869,21 @@ class ConversationService:
                 customer=DossierCustomer(),
                 site=DossierSite(),
                 progress=10,
+                work_item={
+                    "task_id": task_id,
+                    "correlation_id": mission_id,
+                    "title": "FEMAR access-control quote",
+                    "status": "in_progress",
+                    "next_action": TEXT[language]["task_next_input"],
+                    "source_channel": "web",
+                },
             ).model_dump(),
             "messages": [],
-            "created_at": self._now(),
-            "updated_at": self._now(),
+            "created_at": now,
+            "updated_at": now,
         }
+        self._add_event(mission, "mission_created", "Conversation mission and work item created")
+        return mission
 
     def _load_mission(self, mission_id: str) -> dict[str, Any] | None:
         if mission_id in self._missions:
@@ -469,6 +900,9 @@ class ConversationService:
         self._missions[mission["mission_id"]] = deepcopy(mission)
         if self.collection is not None:
             self.collection.replace_one({"mission_id": mission["mission_id"]}, mission, upsert=True)
+        work_item = mission.get("dossier", {}).get("work_item")
+        if self.tasks is not None and work_item:
+            self.tasks.replace_one({"task_id": work_item["task_id"]}, work_item, upsert=True)
 
     def _cached_operation(self, key: str) -> dict[str, Any] | None:
         if key in self._responses:
@@ -505,6 +939,120 @@ class ConversationService:
     def _append_unique(items: list[str], value: str) -> None:
         if value not in items:
             items.append(value)
+
+    def _sync_work_item(self, mission: dict[str, Any]) -> None:
+        dossier = mission["dossier"]
+        work_item = dossier.get("work_item")
+        if not work_item:
+            return
+        quote = dossier.get("quote") or {}
+        if quote.get("status") == "delivered":
+            status = "completed"
+            next_action = TEXT[mission["language"]]["task_done"]
+        elif quote.get("status") == "approved":
+            status = "ready_for_delivery"
+            next_action = TEXT[mission["language"]]["task_next_delivery"]
+        elif quote.get("status") == "draft":
+            status = "awaiting_approval"
+            next_action = TEXT[mission["language"]]["task_next_approval"]
+        elif dossier.get("confirmed_scope") and dossier["customer"].get("identifier"):
+            status = "ready_for_quote"
+            next_action = TEXT[mission["language"]]["task_next_quote"]
+        else:
+            status = "needs_input"
+            next_action = TEXT[mission["language"]]["task_next_input"]
+        work_item.update({"status": status, "next_action": next_action})
+
+    def _add_event(self, mission: dict[str, Any], kind: str, detail: str) -> None:
+        timeline = mission["dossier"].setdefault("timeline", [])
+        at = self._now()
+        seed = f"{mission['mission_id']}:{kind}:{len(timeline)}:{at}"
+        timeline.append(
+            {
+                "event_id": "event_" + sha256(seed.encode()).hexdigest()[:18],
+                "kind": kind,
+                "detail": detail,
+                "at": at,
+            }
+        )
+        if len(timeline) > 200:
+            del timeline[:-200]
+
+    def _catalog_index(self, mission: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+        """Read known catalog items without turning an unavailable source into a match."""
+        index: dict[str, dict[str, Any]] = {}
+        lookup = {
+            "source": f"{self.settings.ralfia_ops_base_url.rstrip('/')}/api/inventory/items",
+            "status": "unavailable",
+            "items_read": 0,
+        }
+
+        items: list[dict[str, Any]] = []
+        try:
+            response = httpx.get(lookup["source"], params={"limit": 200}, timeout=1.2)
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, list):
+                items = [item for item in payload if isinstance(item, dict)]
+            elif isinstance(payload, dict):
+                raw_items = payload.get("items") or payload.get("results") or payload.get("data") or []
+                if isinstance(raw_items, list):
+                    items = [item for item in raw_items if isinstance(item, dict)]
+            lookup.update({"status": "ok", "items_read": len(items)})
+        except Exception:
+            pass
+
+        if self.catalog is not None:
+            try:
+                items.extend(self.catalog.find({}, {"_id": 0}).limit(200))
+            except Exception:
+                pass
+        for draft in mission.get("dossier", {}).get("catalog_drafts", []):
+            if draft.get("status") == "approved_staging" and draft.get("canonical_item_id"):
+                items.append(draft)
+
+        for item in items:
+            if not self._canonical_item_id(item):
+                continue
+            sku = str(item.get("sku") or item.get("item_code") or item.get("code") or "").strip().lower()
+            name = str(item.get("name") or item.get("nombre") or item.get("description") or "").strip()
+            if sku:
+                index.setdefault(f"sku:{sku}", item)
+            if name:
+                index.setdefault(f"name:{self._catalog_key('', name)}", item)
+        return index, lookup
+
+    @classmethod
+    def _find_catalog_match(
+        cls,
+        index: dict[str, dict[str, Any]],
+        sku: str,
+        description: str,
+    ) -> dict[str, Any] | None:
+        normalized_sku = sku.strip().lower()
+        if normalized_sku and f"sku:{normalized_sku}" in index:
+            return index[f"sku:{normalized_sku}"]
+        return index.get(f"name:{cls._catalog_key('', description)}")
+
+    @staticmethod
+    def _canonical_item_id(item: dict[str, Any] | None) -> str:
+        if not item:
+            return ""
+        return str(
+            item.get("canonical_item_id")
+            or item.get("item_id")
+            or item.get("inventory_item_id")
+            or item.get("product_id")
+            or item.get("id")
+            or item.get("_id")
+            or ""
+        )
+
+    @staticmethod
+    def _catalog_key(sku: str, description: str) -> str:
+        value = sku or description
+        ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-") or "item"
 
     @classmethod
     def _public_value(cls, value: Any) -> Any:

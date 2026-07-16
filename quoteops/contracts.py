@@ -260,6 +260,7 @@ class ConversationMessageRequest(BaseModel):
     mission_id: str = Field(default="", max_length=80, pattern=r"^(?:|mission_[a-f0-9]{18})$")
     idempotency_key: str = Field(min_length=8, max_length=120)
     language: LanguageCode = "es"
+    source_channel: Literal["web", "chatgpt_mcp", "whatsapp"] = "web"
     message: str = Field(default="", max_length=30_000)
     attachments: list[ConversationAttachment] = Field(default_factory=list, max_length=20)
 
@@ -287,6 +288,246 @@ class DossierOption(BaseModel):
     code: str
     title: str
     summary: str
+    status: Literal["needs_scope", "needs_costs", "needs_pricing", "ready"] = "needs_costs"
+    line_ids: list[str] = Field(default_factory=list, max_length=100)
+    supplier_cost_total: float = Field(default=0, ge=0)
+    selling_total: float = Field(default=0, ge=0)
+    evidence_count: int = Field(default=0, ge=0)
+
+
+class MissionWorkItem(BaseModel):
+    task_id: str
+    correlation_id: str
+    title: str
+    status: Literal[
+        "in_progress",
+        "needs_input",
+        "ready_for_quote",
+        "awaiting_approval",
+        "ready_for_delivery",
+        "completed",
+    ] = "in_progress"
+    next_action: str = ""
+    source_channel: Literal["web", "chatgpt_mcp", "whatsapp"] = "web"
+
+
+class MissionTimelineEvent(BaseModel):
+    event_id: str
+    kind: Literal[
+        "mission_created",
+        "message_received",
+        "attachment_stored",
+        "evidence_extracted",
+        "evidence_reviewed",
+        "catalog_reviewed",
+        "customer_verified",
+        "supplier_offer_added",
+        "package_selected",
+        "quote_priced",
+        "quote_approved",
+        "delivery_registered",
+    ]
+    detail: str
+    at: str
+
+
+class SupplierOfferLineInput(BaseModel):
+    sku: str = Field(default="", max_length=120)
+    description: str = Field(min_length=2, max_length=400)
+    kind: Literal["equipment", "material", "service", "labor"] = "equipment"
+    quantity: float = Field(default=1, gt=0, le=100_000)
+    unit: str = Field(default="unit", min_length=1, max_length=40)
+    unit_cost: float = Field(gt=0, le=100_000_000)
+    package_codes: list[Literal["A", "B", "C"]] = Field(default_factory=lambda: ["A", "B", "C"])
+
+    @field_validator("sku", "description", "unit", mode="before")
+    @classmethod
+    def strip_offer_line_text(cls, value):
+        return str(value or "").strip()
+
+
+class SupplierOfferCreateRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    supplier_name: str = Field(min_length=2, max_length=200)
+    supplier_reference: str = Field(min_length=2, max_length=200)
+    currency: Literal["USD"] = "USD"
+    tax_included: bool = False
+    effective_at: str = Field(default="", max_length=40)
+    valid_until: str = Field(default="", max_length=40)
+    attachment_storage_id: str = Field(default="", max_length=120)
+    attachment_sha256: str = Field(default="", max_length=64, pattern=r"^(?:|[a-f0-9]{64})$")
+    notes: str = Field(default="", max_length=1000)
+    lines: list[SupplierOfferLineInput] = Field(min_length=1, max_length=100)
+
+    @field_validator(
+        "supplier_name",
+        "supplier_reference",
+        "effective_at",
+        "valid_until",
+        "attachment_storage_id",
+        "attachment_sha256",
+        "notes",
+        mode="before",
+    )
+    @classmethod
+    def strip_offer_text(cls, value):
+        return str(value or "").strip()
+
+
+class SupplierOfferLine(BaseModel):
+    line_id: str
+    sku: str = ""
+    description: str
+    kind: Literal["equipment", "material", "service", "labor"]
+    quantity: float
+    unit: str
+    unit_cost: float
+    line_cost: float
+    package_codes: list[Literal["A", "B", "C"]]
+    catalog_draft_id: str = ""
+    canonical_item_id: str = ""
+
+
+class SupplierOffer(BaseModel):
+    offer_id: str
+    supplier_name: str
+    supplier_reference: str
+    currency: Literal["USD"] = "USD"
+    tax_included: bool = False
+    effective_at: str = ""
+    valid_until: str = ""
+    attachment_storage_id: str = ""
+    attachment_sha256: str = ""
+    notes: str = ""
+    total_cost: float = Field(ge=0)
+    evidence_status: Literal["reference", "attachment", "reference_and_attachment"] = "reference"
+    lines: list[SupplierOfferLine] = Field(default_factory=list)
+
+
+class CatalogDraftItem(BaseModel):
+    catalog_draft_id: str
+    sku: str = ""
+    name: str
+    kind: Literal["equipment", "material", "service", "labor"]
+    unit: str
+    status: Literal["draft", "approved_staging", "rejected"] = "draft"
+    source_offer_id: str
+    source_line_id: str
+    canonical_item_id: str = ""
+    approval_required: bool = True
+    reviewed_by: str = ""
+    review_notes: str = ""
+
+
+class CatalogDraftReviewRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    decision: Literal["approve", "reject"]
+    reviewed_by: str = Field(min_length=2, max_length=120)
+    notes: str = Field(default="", max_length=1000)
+
+
+class ExtractedFact(BaseModel):
+    field: str = Field(min_length=1, max_length=120)
+    value: str = Field(min_length=1, max_length=1000)
+    normalized_value: str = Field(default="", max_length=1000)
+    unit: str = Field(default="", max_length=40)
+    page: int | None = Field(default=None, ge=1, le=100_000)
+    region: str = Field(default="", max_length=120)
+    confidence: float = Field(default=0, ge=0, le=1)
+
+
+class ExtractedProductCandidate(BaseModel):
+    name: str = Field(min_length=2, max_length=300)
+    brand: str = Field(default="", max_length=120)
+    model: str = Field(default="", max_length=120)
+    sku: str = Field(default="", max_length=120)
+    kind: Literal["equipment", "material", "service", "labor"] = "equipment"
+    page: int | None = Field(default=None, ge=1, le=100_000)
+    region: str = Field(default="", max_length=120)
+    confidence: float = Field(default=0, ge=0, le=1)
+
+
+class ExtractedSupplierPrice(BaseModel):
+    supplier_name: str = Field(default="", max_length=200)
+    supplier_reference: str = Field(default="", max_length=200)
+    sku: str = Field(default="", max_length=120)
+    description: str = Field(min_length=2, max_length=400)
+    quantity: float = Field(default=1, gt=0, le=100_000)
+    unit: str = Field(default="unit", min_length=1, max_length=40)
+    unit_cost: float = Field(gt=0, le=100_000_000)
+    currency: Literal["USD"] = "USD"
+    tax_included: bool | None = None
+    page: int | None = Field(default=None, ge=1, le=100_000)
+    region: str = Field(default="", max_length=120)
+    confidence: float = Field(default=0, ge=0, le=1)
+
+
+class MultimodalEvidenceCreateRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    source_file_name: str = Field(min_length=1, max_length=240)
+    media_type: str = Field(default="application/octet-stream", max_length=120)
+    source_attachment_id: str = Field(default="", max_length=120)
+    source_sha256: str = Field(default="", max_length=64, pattern=r"^(?:|[a-f0-9]{64})$")
+    extraction_type: Literal[
+        "product_label",
+        "supplier_price_list",
+        "technical_document",
+        "site_photo",
+        "other",
+    ]
+    extracted_by: Literal["chatgpt_mcp", "web_ocr", "manual"] = "chatgpt_mcp"
+    extracted_text: str = Field(default="", max_length=20_000)
+    facts: list[ExtractedFact] = Field(default_factory=list, max_length=300)
+    products: list[ExtractedProductCandidate] = Field(default_factory=list, max_length=200)
+    supplier_prices: list[ExtractedSupplierPrice] = Field(default_factory=list, max_length=500)
+    warnings: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("source_file_name", "media_type", "source_attachment_id", "source_sha256", mode="before")
+    @classmethod
+    def strip_evidence_source(cls, value):
+        return str(value or "").strip()
+
+
+class MultimodalEvidence(BaseModel):
+    evidence_id: str
+    source_file_name: str
+    media_type: str
+    source_attachment_id: str = ""
+    source_sha256: str = ""
+    extraction_type: Literal[
+        "product_label",
+        "supplier_price_list",
+        "technical_document",
+        "site_photo",
+        "other",
+    ]
+    extracted_by: Literal["chatgpt_mcp", "web_ocr", "manual"]
+    extracted_text: str = ""
+    facts: list[ExtractedFact] = Field(default_factory=list)
+    products: list[ExtractedProductCandidate] = Field(default_factory=list)
+    supplier_prices: list[ExtractedSupplierPrice] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    status: Literal["source_unlinked", "needs_review", "confirmed", "rejected"]
+    reviewed_by: str = ""
+    review_notes: str = ""
+    extracted_at: str
+
+
+class EvidenceReviewRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    decision: Literal["confirm", "reject"]
+    reviewed_by: str = Field(min_length=2, max_length=120)
+    notes: str = Field(default="", max_length=1000)
+
+
+class PackageSelectionRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=120)
+    language: LanguageCode = "es"
+    option_code: Literal["A", "B", "C"]
 
 
 class EditableQuoteLine(BaseModel):
@@ -294,6 +535,11 @@ class EditableQuoteLine(BaseModel):
     description: str = Field(min_length=1, max_length=400)
     quantity: float = Field(default=1, gt=0, le=100_000)
     unit_price: float = Field(default=0, ge=0, le=100_000_000)
+    unit_cost: float = Field(default=0, ge=0, le=100_000_000)
+    sku: str = Field(default="", max_length=120)
+    kind: Literal["equipment", "material", "service", "labor", ""] = ""
+    supplier_offer_id: str = Field(default="", max_length=120)
+    price_source: Literal["unpriced", "human_entered"] = "unpriced"
 
 
 class EditableQuote(BaseModel):
@@ -307,6 +553,8 @@ class EditableQuote(BaseModel):
     artifact_id: str = ""
     pdf_url: str = ""
     delivery_id: str = ""
+    selected_option_code: Literal["A", "B", "C", ""] = ""
+    supplier_cost_total: float = Field(default=0, ge=0)
 
 
 class ContextDossier(BaseModel):
@@ -317,7 +565,12 @@ class ContextDossier(BaseModel):
     risks: list[str] = Field(default_factory=list)
     questions: list[str] = Field(default_factory=list)
     options: list[DossierOption] = Field(default_factory=list)
+    supplier_offers: list[SupplierOffer] = Field(default_factory=list)
+    catalog_drafts: list[CatalogDraftItem] = Field(default_factory=list)
+    extracted_evidence: list[MultimodalEvidence] = Field(default_factory=list)
     attachments: list[ConversationAttachment] = Field(default_factory=list)
+    work_item: MissionWorkItem | None = None
+    timeline: list[MissionTimelineEvent] = Field(default_factory=list, max_length=200)
     progress: int = Field(default=0, ge=0, le=100)
     quote: EditableQuote | None = None
 

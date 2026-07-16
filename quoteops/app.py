@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from getpass import getuser
 from hashlib import sha256
+import hmac
+import json
 from pathlib import Path
 from platform import node
 import re
@@ -20,11 +22,15 @@ from quoteops.adapters.smart_quoter import SmartQuoterAdapter
 from quoteops.adapters.tool_planner import build_tool_plan
 from quoteops.adapters.taxpayer_registry import TaxpayerRegistryError, normalize_ec_identifier
 from quoteops.contracts import (
+    CatalogDraftReviewRequest,
     ConversationMessageRequest,
     ConversationReply,
     CustomerIdentifierLookupRequest,
+    EvidenceReviewRequest,
     MissionApprovalRequest,
     MissionDeliveryRequest,
+    MultimodalEvidenceCreateRequest,
+    PackageSelectionRequest,
     QuoteIntake,
     QuoteIntakeAnalysis,
     PublicProgressResponse,
@@ -34,18 +40,20 @@ from quoteops.contracts import (
     RucConfirmRequest,
     RucLookupRequest,
     RucLookupResult,
+    SupplierOfferCreateRequest,
 )
 from quoteops.conversation import ConversationService
 from quoteops.customer_identity import CustomerIdentityService
 from quoteops.frontend import render_cockpit_page
 from quoteops.iess_payments import IessPaymentService
 from quoteops.integration_trace import IntegrationTraceStore, seed_integration_traces
+from quoteops.mcp_contract import QuoteOpsMcpContract
 from quoteops.operations_dashboard import OperationsDashboardService
 from quoteops.public_progress import PublicProgressFeed
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
 
-app = FastAPI(title="RalphiIA QuoteOps", version="0.6.0")
+app = FastAPI(title="RalphiIA QuoteOps", version="0.7.0")
 settings = get_settings()
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
@@ -54,6 +62,7 @@ _smart_quoter = SmartQuoterAdapter(settings.smart_quoter_base_url)
 _iess_payments = IessPaymentService(settings)
 _operations_dashboard = OperationsDashboardService(settings.mongo_uri)
 _conversation = ConversationService(settings)
+_mcp_contract = QuoteOpsMcpContract(_conversation, _execution_service)
 _trace_store = IntegrationTraceStore()
 seed_integration_traces(
     _trace_store,
@@ -176,6 +185,73 @@ async def conversation_mission(mission_id: str, language: str = "es") -> Convers
 async def conversation_quote_update(mission_id: str, request: QuoteUpdateRequest) -> ConversationReply:
     try:
         return _conversation.update_quote(mission_id, request)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/supplier-offers")
+async def conversation_supplier_offer(
+    mission_id: str,
+    request: SupplierOfferCreateRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.add_supplier_offer(mission_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/evidence/extractions")
+async def conversation_extracted_evidence(
+    mission_id: str,
+    request: MultimodalEvidenceCreateRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.record_extracted_evidence(mission_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/evidence/{evidence_id}/review")
+async def conversation_evidence_review(
+    mission_id: str,
+    evidence_id: str,
+    request: EvidenceReviewRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.review_extracted_evidence(mission_id, evidence_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/catalog-drafts/{catalog_draft_id}/review")
+async def conversation_catalog_draft_review(
+    mission_id: str,
+    catalog_draft_id: str,
+    request: CatalogDraftReviewRequest,
+) -> JSONResponse:
+    try:
+        return JSONResponse(_conversation.review_catalog_draft(mission_id, catalog_draft_id, request))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=_mission_error(str(exc), request.language)) from exc
+
+
+@app.post("/api/conversation/missions/{mission_id}/packages/select", response_model=ConversationReply)
+async def conversation_package_select(
+    mission_id: str,
+    request: PackageSelectionRequest,
+) -> ConversationReply:
+    try:
+        return _conversation.select_package(mission_id, request)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=_mission_error("mission_not_found", request.language)) from exc
     except ValueError as exc:
@@ -523,6 +599,71 @@ async def mcp_quoteops_intake(request: dict) -> JSONResponse:
     return JSONResponse(_channel_router.ingest(channel, payload, str(request.get("signature") or "")))
 
 
+@app.get("/api/mcp/tools")
+async def quoteops_mcp_tools(request: Request) -> JSONResponse:
+    _require_mcp_auth(request)
+    return JSONResponse({"ok": True, "tools": _mcp_contract.tools(), "production_writes": False})
+
+
+@app.post("/api/mcp/call")
+async def quoteops_mcp_call(request: Request, payload: dict) -> JSONResponse:
+    _require_mcp_auth(request)
+    name = str(payload.get("name") or "")
+    arguments = payload.get("arguments") if isinstance(payload.get("arguments"), dict) else {}
+    result = _mcp_contract.call(name, arguments)
+    return JSONResponse(result, status_code=200 if result.get("ok", True) else 422)
+
+
+@app.post("/mcp")
+async def quoteops_streamable_mcp(request: Request, payload: dict) -> Response:
+    """Stateless JSON-RPC surface for the isolated QuoteOps staging connector."""
+    _require_mcp_auth(request)
+    method = str(payload.get("method") or "")
+    request_id = payload.get("id")
+    if method == "notifications/initialized":
+        return Response(status_code=202)
+    if method == "initialize":
+        requested = str((payload.get("params") or {}).get("protocolVersion") or "2025-06-18")
+        return JSONResponse(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": requested,
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": {"name": "ralphiia-quoteops-staging", "version": "0.7.0"},
+                    "instructions": (
+                        "Create or continue a mission first. Never invent supplier costs or selling "
+                        "prices, and require human approval before delivery."
+                    ),
+                },
+            }
+        )
+    if method == "ping":
+        return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": {}})
+    if method == "tools/list":
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": request_id, "result": {"tools": _mcp_contract.tools()}}
+        )
+    if method == "tools/call":
+        params = payload.get("params") or {}
+        result = _mcp_contract.call(str(params.get("name") or ""), params.get("arguments") or {})
+        tool_result = {
+            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
+            "structuredContent": result,
+            "isError": not result.get("ok", True),
+        }
+        return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": tool_result})
+    return JSONResponse(
+        {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": -32601, "message": "Method not found"},
+        },
+        status_code=404,
+    )
+
+
 @app.post("/api/webhooks/whatsapp")
 async def whatsapp_webhook(request: dict) -> JSONResponse:
     return JSONResponse(_channel_router.ingest("whatsapp", request, str(request.get("signature") or "")))
@@ -531,6 +672,19 @@ async def whatsapp_webhook(request: dict) -> JSONResponse:
 @app.post("/api/webhooks/telegram")
 async def telegram_webhook(request: dict) -> JSONResponse:
     return JSONResponse(_channel_router.ingest("telegram", request, str(request.get("signature") or "")))
+
+
+def _require_mcp_auth(request: Request) -> None:
+    expected = settings.quoteops_mcp_api_key
+    if not expected:
+        if settings.env.lower() in {"prod", "production"}:
+            raise HTTPException(status_code=503, detail={"code": "mcp_auth_not_configured"})
+        return
+    authorization = request.headers.get("authorization", "")
+    bearer = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+    supplied = request.headers.get("x-api-key", "") or bearer
+    if not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=401, detail={"code": "mcp_auth_required"})
 
 
 def _allow_iess_local_request(request: Request) -> bool:
@@ -590,6 +744,9 @@ def _mission_error(code: str, language: str) -> dict[str, str]:
             "approval_required": "La cotización necesita aprobación humana antes de entregarse.",
             "approval_blocked": "La aprobación quedó bloqueada por datos faltantes.",
             "delivery_blocked": "La entrega no pudo registrarse.",
+            "attachment_evidence_not_found": "La evidencia no coincide con un archivo almacenado en este expediente.",
+            "evidence_not_found": "No se encontró la extracción solicitada.",
+            "catalog_draft_not_found": "No se encontró el borrador de producto o servicio solicitado.",
         },
         "en": {
             "message_or_attachment_required": "Write a message or attach at least one file.",
@@ -599,6 +756,9 @@ def _mission_error(code: str, language: str) -> dict[str, str]:
             "approval_required": "The quote needs human approval before delivery.",
             "approval_blocked": "Approval was blocked by missing information.",
             "delivery_blocked": "Delivery could not be registered.",
+            "attachment_evidence_not_found": "The evidence does not match a file stored in this case.",
+            "evidence_not_found": "The requested extraction was not found.",
+            "catalog_draft_not_found": "The requested product or service draft was not found.",
         },
     }
     locale = language if language in messages else "es"

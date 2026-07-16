@@ -49,9 +49,18 @@ class QuoteExecutionService:
         timeline = [self._event("intake_validated", "Intake validado")]
         if missing:
             return {"ok": True, "approval_id": approval_id, "status": "blocked", "blockers": missing, "timeline": timeline + [self._event("approval_blocked", "Faltan datos obligatorios")]}
+        quote = request.get("quote") or {}
+        if quote and (float(quote.get("total") or 0) <= 0 or not quote.get("lines")):
+            return {
+                "ok": True,
+                "approval_id": approval_id,
+                "status": "blocked",
+                "blockers": ["quote_pricing_required"],
+                "timeline": timeline + [self._event("approval_blocked", "La cotizacion no tiene precios confirmados")],
+            }
         artifact_id = "artifact_" + uuid4().hex[:18]
         path = self.artifact_root / f"{artifact_id}.pdf"
-        path.write_bytes(self._pdf(str(intake["customer_name"]), str(intake["original_text"])))
+        path.write_bytes(self._pdf(str(intake["customer_name"]), str(intake["original_text"]), quote))
         record = {"approval_id": approval_id, "artifact_id": artifact_id, "path": str(path), "timeline": timeline + [self._event("approved", "Aprobacion humana registrada")]}
         self.approvals[approval_id] = record
         if self.db is not None:
@@ -91,12 +100,42 @@ class QuoteExecutionService:
         return {"at": time.time(), "kind": kind, "detail": detail}
 
     @staticmethod
-    def _pdf(customer: str, text: str) -> bytes:
+    def _pdf(customer: str, text: str, quote: dict | None = None) -> bytes:
         def pdf_text(value: str, limit: int) -> str:
             clean = str(value or "").encode("ascii", "replace").decode("ascii")[:limit]
             return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)").replace("\n", " ")
 
-        content = f"BT /F1 12 Tf 50 760 Td 16 TL (RalphiIA QuoteOps) Tj T* (Customer: {pdf_text(customer, 100)}) Tj T* (Quote: {pdf_text(text, 400)}) Tj ET"
+        quote = quote or {}
+        text_lines = [
+            "RalphiIA QuoteOps",
+            f"Customer: {customer}",
+        ]
+        option_code = str(quote.get("selected_option_code") or "").strip()
+        if option_code:
+            text_lines.append(f"Selected package: {option_code}")
+        for line in quote.get("lines") or []:
+            description = str(line.get("description") or "Item")
+            quantity = float(line.get("quantity") or 0)
+            unit_price = float(line.get("unit_price") or 0)
+            text_lines.append(
+                f"{description}: {quantity:g} x USD {unit_price:.2f} = USD {quantity * unit_price:.2f}"
+            )
+        if quote:
+            text_lines.extend(
+                [
+                    f"Subtotal: USD {float(quote.get('subtotal') or 0):.2f}",
+                    f"Tax: USD {float(quote.get('tax') or 0):.2f}",
+                    f"Total: USD {float(quote.get('total') or 0):.2f}",
+                ]
+            )
+        else:
+            text_lines.append(f"Quote: {text}")
+        commands = ["BT /F1 11 Tf 50 760 Td 15 TL"]
+        for index, line in enumerate(text_lines[:42]):
+            prefix = "" if index == 0 else "T* "
+            commands.append(f"{prefix}({pdf_text(line, 140)}) Tj")
+        commands.append("ET")
+        content = " ".join(commands)
         objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>", b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", f"<< /Length {len(content)} >>\nstream\n{content}\nendstream".encode()]
         out = bytearray(b"%PDF-1.4\n")
         offsets = [0]
