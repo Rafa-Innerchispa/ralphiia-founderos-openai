@@ -352,7 +352,7 @@ class SupplierOfferCreateRequest(BaseModel):
     supplier_name: str = Field(min_length=2, max_length=200)
     supplier_reference: str = Field(min_length=2, max_length=200)
     currency: Literal["USD"] = "USD"
-    tax_included: bool = False
+    tax_included: bool | None = None
     effective_at: str = Field(default="", max_length=40)
     valid_until: str = Field(default="", max_length=40)
     attachment_storage_id: str = Field(default="", max_length=120)
@@ -394,7 +394,7 @@ class SupplierOffer(BaseModel):
     supplier_name: str
     supplier_reference: str
     currency: Literal["USD"] = "USD"
-    tax_included: bool = False
+    tax_included: bool | None = None
     effective_at: str = ""
     valid_until: str = ""
     attachment_storage_id: str = ""

@@ -144,6 +144,7 @@ class TestFemarSupplierFlow(unittest.TestCase):
         replayed_offer = self.service.add_supplier_offer(self.initial.mission_id, offer_request)
 
         self.assertEqual(offer["supplier_offer"]["total_cost"], 85)
+        self.assertIsNone(offer["supplier_offer"]["tax_included"])
         self.assertTrue(replayed_offer["idempotent_replay"])
         self.assertEqual(offer["catalog_drafts_created"][0]["status"], "draft")
         self.assertTrue(offer["catalog_drafts_created"][0]["approval_required"])
