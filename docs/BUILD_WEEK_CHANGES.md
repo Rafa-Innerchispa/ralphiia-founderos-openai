@@ -44,3 +44,11 @@
 - Expanded the generated PDF to include selected package, quote lines, subtotal, tax, and total while intentionally excluding internal supplier costs.
 - Added a typed staging MCP surface for mission, evidence, supplier offer, package, quote, approval, and delivery operations. It exposes no shell, arbitrary Mongo query, or generic URL execution.
 - Preserved the production boundary: the shared RalphiIA MCP service and gateway were audited read-only and were not restarted or modified.
+
+## Real supplier catalog ingestion
+
+- Archived nine original PDF/image sources with SHA-256 provenance and recorded nine human-confirmed multimodal evidence entries.
+- Deduplicated 39 priced products before persistence: four existing catalog SKUs were linked and 35 missing items were approved only in the isolated QuoteOps staging catalog.
+- Preserved unknown tax treatment as `null` because the supplier sources did not state whether tax was included.
+- Kept imported catalog prices outside FEMAR packages until a human selects the technical architecture; supplier cost never became selling price.
+- Verified 39 unique SKUs, 39 canonical links, zero duplicate staging SKUs, and zero production catalog writes.

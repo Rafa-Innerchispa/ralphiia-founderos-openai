@@ -17,6 +17,15 @@
   },
   "decisions": [
     {
+      "id": "decision-source-truth",
+      "title_es": "Los datos comerciales conservan lo desconocido",
+      "title_en": "Commercial data preserves unknown values",
+      "summary_es": "Los precios se guardan con evidencia y deduplicación; un dato tributario no indicado permanece desconocido en lugar de asumirse.",
+      "summary_en": "Prices are stored with evidence and deduplication; an unstated tax value remains unknown instead of being assumed.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T03:58:00+00:00"
+    },
+    {
       "id": "decision-multimodal-evidence",
       "title_es": "La evidencia multimodal permanece verificable",
       "title_en": "Multimodal evidence remains verifiable",
@@ -63,6 +72,20 @@
     }
   ],
   "events": [
+    {
+      "id": "event-real-supplier-ingestion",
+      "type": "verification",
+      "title_es": "Primera ingesta real de proveedor verificada",
+      "title_en": "First real supplier ingestion verified",
+      "summary_es": "Nueve fuentes originales produjeron 39 artículos únicos: los existentes se enlazaron y los faltantes quedaron aislados sin duplicados ni escrituras de producción.",
+      "summary_en": "Nine original sources produced 39 unique items: existing records were linked and missing records remained isolated without duplicates or production writes.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T03:58:00+00:00",
+      "evidence": {
+        "commit": "88c5993",
+        "tests": "50/50"
+      }
+    },
     {
       "id": "event-femar-multimodal-flow",
       "type": "commit",

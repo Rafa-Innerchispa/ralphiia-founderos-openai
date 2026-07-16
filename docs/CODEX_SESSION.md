@@ -9,7 +9,7 @@
 - Canonical repository: `/home/rlopez/projects/ralphiia-quoteops`
 - Role: QuoteOps writer; Astro is owned by Gemini/Visual Code through a separate repository
 - Runtime safety: staging only; production writes disabled; Smart Quoter `:2026` read-only
-- Current status: FEMAR multimodal/supplier/package MCP flow verified on canonical staging `:8765`; 50/50 canonical tests pass and the separate P0 commit is being finalized
+- Current status: FEMAR MCP flow and the first real supplier ingestion are verified on canonical staging `:8765`; 50/50 tests pass, 39 unique priced items are linked, and no production writes occurred
 - Baseline commit: `efa08e5`
 
 ## Coordination
