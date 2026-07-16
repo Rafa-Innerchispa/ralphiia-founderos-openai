@@ -118,6 +118,18 @@ class TestConversationService(unittest.TestCase):
         self.assertIn("payments", " ".join(english.dossier.questions).lower())
         self.assertNotIn("doors", " ".join(english.dossier.questions).lower())
 
+        quoted = self.service.message(
+            ConversationMessageRequest(
+                mission_id=initial.mission_id,
+                idempotency_key="photo-workshop-language-quote-0001",
+                language="es",
+                message="Preparar cotización editable.",
+            )
+        )
+        self.assertEqual(quoted.dossier.quote.lines[0].description, "Levantamiento del flujo y arquitectura")
+        translated_quote = self.service.get(initial.mission_id, "en")
+        self.assertEqual(translated_quote.dossier.quote.lines[0].description, "Workflow assessment and architecture")
+
     def test_general_project_never_inherits_femar_or_access_questions(self):
         result = self.service.message(
             ConversationMessageRequest(

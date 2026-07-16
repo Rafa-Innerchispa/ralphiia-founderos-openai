@@ -157,6 +157,31 @@ TEXT = {
     },
 }
 
+QUOTE_LINE_TEXT = {
+    "es": {
+        "assessment": "Levantamiento técnico y diseño",
+        "equipment": "Equipos y materiales de control de acceso",
+        "implementation": "Instalación, configuración y capacitación",
+        "photo_discovery": "Levantamiento del flujo y arquitectura",
+        "photo_collections": "Organización de colecciones y metadatos",
+        "photo_delivery": "Entrega privada desde servidor local",
+        "photo_billing": "Automatización de cobros y seguimiento",
+        "photo_ai": "IA local sujeta a validación de infraestructura",
+        "photo_implementation": "Implementación, migración y capacitación",
+    },
+    "en": {
+        "assessment": "Technical assessment and design",
+        "equipment": "Access-control equipment and materials",
+        "implementation": "Installation, configuration, and training",
+        "photo_discovery": "Workflow assessment and architecture",
+        "photo_collections": "Collection and metadata organization",
+        "photo_delivery": "Private delivery from the local server",
+        "photo_billing": "Billing and payment-tracking automation",
+        "photo_ai": "Local AI subject to infrastructure validation",
+        "photo_implementation": "Implementation, migration, and training",
+    },
+}
+
 
 class ConversationService:
     """Deterministic, staging-safe mission state for the conversation-first flow."""
@@ -1139,6 +1164,7 @@ class ConversationService:
         work_item = dossier.get("work_item")
         if work_item:
             work_item["title"] = project["title"]
+        self._translate_quote_lines(dossier, language)
 
     @staticmethod
     def _translate_known_values(items: list[str], keys: tuple[str, ...], language: str) -> None:
@@ -1148,6 +1174,14 @@ class ConversationService:
                 continue
             items[:] = [item for item in items if item not in variants]
             items.append(TEXT[language][key])
+
+    @staticmethod
+    def _translate_quote_lines(dossier: dict[str, Any], language: str) -> None:
+        quote = dossier.get("quote") or {}
+        for line in quote.get("lines", []):
+            description = QUOTE_LINE_TEXT[language].get(line.get("line_id", ""))
+            if description:
+                line["description"] = description
 
     @staticmethod
     def _extract_photo_facts(project: dict[str, Any], text: str) -> None:
@@ -1167,48 +1201,29 @@ class ConversationService:
 
     def _quote_draft(self, dossier: dict[str, Any], language: str) -> EditableQuote:
         if self._project_kind(dossier) == "photo_workshop":
-            descriptions = (
-                [
-                    "Levantamiento del flujo y arquitectura",
-                    "Organización de colecciones y metadatos",
-                    "Entrega privada desde servidor local",
-                    "Automatización de cobros y seguimiento",
-                    "IA local sujeta a validación de infraestructura",
-                    "Implementación, migración y capacitación",
-                ]
-                if language == "es"
-                else [
-                    "Workflow assessment and architecture",
-                    "Collection and metadata organization",
-                    "Private delivery from the local server",
-                    "Billing and payment-tracking automation",
-                    "Local AI subject to infrastructure validation",
-                    "Implementation, migration, and training",
-                ]
-            )
+            descriptions = QUOTE_LINE_TEXT[language]
             return EditableQuote(
                 status="needs_pricing",
                 lines=[
-                    EditableQuoteLine(line_id="photo_discovery", description=descriptions[0], quantity=1, unit_price=0),
-                    EditableQuoteLine(line_id="photo_collections", description=descriptions[1], quantity=1, unit_price=0),
-                    EditableQuoteLine(line_id="photo_delivery", description=descriptions[2], quantity=1, unit_price=0),
-                    EditableQuoteLine(line_id="photo_billing", description=descriptions[3], quantity=1, unit_price=0),
-                    EditableQuoteLine(line_id="photo_ai", description=descriptions[4], quantity=1, unit_price=0),
-                    EditableQuoteLine(line_id="photo_implementation", description=descriptions[5], quantity=1, unit_price=0),
+                    EditableQuoteLine(line_id=line_id, description=descriptions[line_id], quantity=1, unit_price=0)
+                    for line_id in (
+                        "photo_discovery",
+                        "photo_collections",
+                        "photo_delivery",
+                        "photo_billing",
+                        "photo_ai",
+                        "photo_implementation",
+                    )
                 ],
             )
         access_points = int(dossier["site"].get("access_points") or 1)
-        descriptions = (
-            ["Levantamiento técnico y diseño", "Equipos y materiales de control de acceso", "Instalación, configuración y capacitación"]
-            if language == "es"
-            else ["Technical assessment and design", "Access-control equipment and materials", "Installation, configuration, and training"]
-        )
+        descriptions = QUOTE_LINE_TEXT[language]
         return EditableQuote(
             status="needs_pricing",
             lines=[
-                EditableQuoteLine(line_id="assessment", description=descriptions[0], quantity=1, unit_price=0),
-                EditableQuoteLine(line_id="equipment", description=descriptions[1], quantity=access_points, unit_price=0),
-                EditableQuoteLine(line_id="implementation", description=descriptions[2], quantity=1, unit_price=0),
+                EditableQuoteLine(line_id="assessment", description=descriptions["assessment"], quantity=1, unit_price=0),
+                EditableQuoteLine(line_id="equipment", description=descriptions["equipment"], quantity=access_points, unit_price=0),
+                EditableQuoteLine(line_id="implementation", description=descriptions["implementation"], quantity=1, unit_price=0),
             ],
         )
 
