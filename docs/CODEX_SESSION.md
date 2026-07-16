@@ -9,9 +9,10 @@
 - Canonical repository: `/home/rlopez/projects/ralphiia-quoteops`
 - Role: QuoteOps writer; Astro is owned by Gemini/Visual Code through a separate repository
 - Runtime safety: staging only; production writes disabled; Smart Quoter `:2026` read-only
-- Current status: the evidence-backed multichannel decision workspace is verified on canonical staging `:8765`; 54/54 full-host tests pass, the real FEMAR mission has six confirmed requirements, 39 sourced offer lines, and zero generated alternatives, and no production writes occurred
+- Current status: multibusiness project profiles are verified on canonical staging `:8765`; 57/57 full-host tests pass, FEMAR remains isolated, a photography-workshop mission now has its own bilingual questions and editable zero-price quote, and no production writes occurred
 - Baseline commit: `efa08e5`
 - Current increment base: `a265c05`
+- Current canonical HEAD: `6389879`
 
 ## Coordination
 

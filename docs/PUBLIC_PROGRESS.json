@@ -5,17 +5,26 @@
     "title_es": "QuoteOps se construye en abierto con evidencia verificable",
     "title_en": "QuoteOps is being built in the open with verifiable evidence",
     "status": "active",
-    "phase_es": "Espacio de decisión multicanal verificado en staging",
-    "phase_en": "Multichannel decision workspace verified in staging",
-    "progress_percent": 52
+    "phase_es": "Expedientes multinegocio verificados en staging",
+    "phase_en": "Multi-business case files verified in staging",
+    "progress_percent": 58
   },
   "verification": {
-    "tests_passed": 54,
-    "tests_total": 54,
+    "tests_passed": 57,
+    "tests_total": 57,
     "staging_status": "healthy",
-    "commit": "f0abb2e"
+    "commit": "6389879"
   },
   "decisions": [
+    {
+      "id": "decision-project-profiles",
+      "title_es": "Cada negocio conserva su propio contexto",
+      "title_en": "Each business keeps its own context",
+      "summary_es": "El expediente clasifica el tipo de proyecto y formula preguntas, opciones y líneas editables propias sin heredar supuestos de otro caso.",
+      "summary_en": "The case file classifies the project type and provides its own questions, options, and editable lines without inheriting assumptions from another case.",
+      "status": "accepted",
+      "decided_at": "2026-07-16T15:05:00+00:00"
+    },
     {
       "id": "decision-sourced-configurations",
       "title_es": "Las configuraciones usan costos con fuente",
@@ -81,6 +90,20 @@
     }
   ],
   "events": [
+    {
+      "id": "event-multibusiness-project-profiles",
+      "type": "verification",
+      "title_es": "Segundo tipo de proyecto verificado",
+      "title_en": "Second project type verified",
+      "summary_es": "QuoteOps ahora separa proyectos generales, control de acceso y talleres fotográficos, con preguntas y cotizaciones bilingües propias y precios iniciales en cero.",
+      "summary_en": "QuoteOps now separates general projects, access control, and photography workshops, with their own bilingual questions and quote lines whose initial prices remain zero.",
+      "status": "completed",
+      "occurred_at": "2026-07-16T15:05:00+00:00",
+      "evidence": {
+        "commit": "6389879",
+        "tests": "57/57"
+      }
+    },
     {
       "id": "event-multichannel-decision-workspace",
       "type": "verification",
