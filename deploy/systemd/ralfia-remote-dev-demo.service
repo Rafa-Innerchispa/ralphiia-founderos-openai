@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/rlopez/releases/ralfia-remote-dev-demo/5a11afd
+WorkingDirectory=/home/rlopez/releases/ralfia-remote-dev-demo/current
 EnvironmentFile=/home/rlopez/projects/raphiia-openai/.env
-Environment=PYTHONPATH=/home/rlopez/releases/ralfia-remote-dev-demo/5a11afd
+Environment=PYTHONPATH=/home/rlopez/releases/ralfia-remote-dev-demo/current
 Environment=REMOTE_DEV_DEMO_MODE=mcp
 Environment=REMOTE_DEV_MCP_URL=http://127.0.0.1:8102/mcp
 Environment=REMOTE_DEV_EXECUTE_CODEX=1

@@ -48,7 +48,7 @@ Después se repite `scripts/run_remote_dev_e2e.py`. Solo un resultado con tarea 
 
 ## Servicio aislado
 
-- Release: `/home/rlopez/releases/ralfia-remote-dev-demo/5a11afd`
+- Release activa: symlink `/home/rlopez/releases/ralfia-remote-dev-demo/current` hacia un commit inmutable.
 - Unidad: `~/.config/systemd/user/ralfia-remote-dev-demo.service`
 - Bind: `127.0.0.1:8766`
 - Workspace sintético: `/home/rlopez/worktrees/ralfia-public-demo`
