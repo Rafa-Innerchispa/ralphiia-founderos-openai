@@ -24,6 +24,7 @@ MAX_MEDIA_BYTES = 5 * 1024 * 1024
 SESSION_TTL = timedelta(minutes=30)
 MAX_ACTIONS_PER_SESSION = 3
 MAX_ACTIVE_SESSIONS = 200
+SAFE_ENV_KEYS = ("HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL", "SHELL", "CODEX_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR")
 ALLOWED_MEDIA = {
     "audio/ogg": "audio",
     "audio/webm": "audio",
@@ -413,6 +414,7 @@ class CodexScenarioExecutor:
 
     @staticmethod
     def _run(command: list[str], cwd: Path, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+        safe_env = {key: os.environ[key] for key in SAFE_ENV_KEYS if os.environ.get(key)}
         process = subprocess.Popen(
             command,
             cwd=cwd,
@@ -420,6 +422,7 @@ class CodexScenarioExecutor:
             stderr=subprocess.PIPE,
             text=True,
             stdin=subprocess.DEVNULL,
+            env=safe_env,
             start_new_session=True,
         )
         try:
@@ -492,6 +495,8 @@ class CodexScenarioExecutor:
             self.codex_bin,
             "exec",
             "--ignore-user-config",
+            "-c",
+            "shell_environment_policy.inherit=none",
             "--sandbox",
             "workspace-write",
             "--ephemeral",

@@ -1,13 +1,17 @@
 import asyncio
+import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from quoteops.remote_dev_api import build_remote_dev_router
 from quoteops.remote_dev_demo import (
+    CodexScenarioExecutor,
     DemoRegistry,
     ExecutionResult,
     LocalMediaProcessor,
@@ -195,6 +199,15 @@ class RemoteDevDemoTest(unittest.TestCase):
         responses = [client.post("/api/remote-dev/sessions") for _ in range(7)]
         self.assertTrue(all(item.status_code == 200 for item in responses[:6]))
         self.assertEqual(responses[6].status_code, 429)
+
+    def test_executor_subprocess_does_not_inherit_mcp_secret(self):
+        with patch.dict(os.environ, {"MCP_API_KEY": "fixture-secret"}, clear=False):
+            result = CodexScenarioExecutor._run(
+                [sys.executable, "-c", "import os; print(os.getenv('MCP_API_KEY'))"],
+                Path(self.temporary.name),
+                10,
+            )
+        self.assertEqual(result.stdout.strip(), "None")
 
 
 if __name__ == "__main__":
