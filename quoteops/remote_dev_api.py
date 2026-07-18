@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from hashlib import sha256
 import shutil
+from threading import RLock
+from time import monotonic
 from typing import Any
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -23,6 +26,32 @@ from quoteops.remote_dev_frontend import render_remote_dev_demo
 
 class ApprovalRequest(BaseModel):
     checkpoint: str
+
+
+class DemoRateLimiter:
+    """Small in-memory limiter; client identifiers are hashed and never logged."""
+
+    def __init__(self) -> None:
+        self._hits: dict[str, list[float]] = {}
+        self._lock = RLock()
+
+    def allow(self, key: str, *, limit: int, window_seconds: int) -> bool:
+        now = monotonic()
+        cutoff = now - window_seconds
+        digest = sha256(key.encode()).hexdigest()
+        with self._lock:
+            recent = [stamp for stamp in self._hits.get(digest, []) if stamp >= cutoff]
+            if len(recent) >= limit:
+                self._hits[digest] = recent
+                return False
+            recent.append(now)
+            self._hits[digest] = recent
+            return True
+
+
+def _client_key(request: Request) -> str:
+    forwarded = request.headers.get("CF-Connecting-IP", "").strip()
+    return forwarded or (request.client.host if request.client else "unknown")
 
 
 def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
@@ -46,7 +75,7 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
     )
     media = LocalMediaProcessor(
         workspace_root / "media",
-        whisper_url=str(getattr(settings, "remote_dev_whisper_url", "http://127.0.0.1:9000")),
+        whisper_url=str(getattr(settings, "remote_dev_whisper_url", "http://127.0.0.1:9001")),
     )
     return RemoteDevDemoService(DemoRegistry(), coordination, executor, media)
 
@@ -54,6 +83,7 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
 def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None = None) -> APIRouter:
     router = APIRouter()
     demo = service or build_remote_dev_service(settings)
+    limiter = DemoRateLimiter()
 
     @router.get("/remote-dev-demo", response_class=HTMLResponse)
     async def remote_dev_demo_page() -> HTMLResponse:
@@ -86,11 +116,17 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         )
 
     @router.post("/api/remote-dev/sessions")
-    async def create_remote_dev_session() -> JSONResponse:
-        return JSONResponse(demo.create_session())
+    async def create_remote_dev_session(request: Request) -> JSONResponse:
+        if not limiter.allow(_client_key(request) + ":session", limit=6, window_seconds=600):
+            raise HTTPException(status_code=429, detail="demo_rate_limit_reached")
+        try:
+            return JSONResponse(demo.create_session())
+        except PermissionError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.post("/api/remote-dev/sessions/{session_id}/messages")
     async def remote_dev_message(
+        request: Request,
         session_id: str,
         request_id: str = Form(...),
         scenario_id: str = Form(...),
@@ -99,6 +135,8 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         session_token: str = Header(..., alias="X-Demo-Session-Token"),
     ) -> JSONResponse:
         try:
+            if not limiter.allow(_client_key(request) + ":action", limit=30, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
             media_data = await media.read(MAX_MEDIA_BYTES + 1) if media else None
             result = await demo.submit(
                 session_id,
@@ -119,13 +157,16 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
 
     @router.post("/api/remote-dev/sessions/{session_id}/actions/{action_id}/approve")
     async def approve_remote_dev_action(
+        http_request: Request,
         session_id: str,
         action_id: str,
-        request: ApprovalRequest,
+        approval: ApprovalRequest,
         session_token: str = Header(..., alias="X-Demo-Session-Token"),
     ) -> JSONResponse:
         try:
-            result = await demo.approve(session_id, session_token, action_id, request.checkpoint)
+            if not limiter.allow(_client_key(http_request) + ":action", limit=30, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
+            result = await demo.approve(session_id, session_token, action_id, approval.checkpoint)
             return JSONResponse(result, status_code=200 if result.get("ok") else 409)
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -145,4 +186,3 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     return router
-

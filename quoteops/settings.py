@@ -61,7 +61,7 @@ class Settings(BaseModel):
     }
     remote_dev_workspace_root: str = os.getenv("REMOTE_DEV_WORKSPACE_ROOT", "/tmp/ralfia-remote-dev-demo")
     remote_dev_timeout_seconds: int = int(os.getenv("REMOTE_DEV_TIMEOUT_SECONDS", "240"))
-    remote_dev_whisper_url: str = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9000")
+    remote_dev_whisper_url: str = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")
 
 
 @lru_cache(maxsize=1)

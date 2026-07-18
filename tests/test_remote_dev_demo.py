@@ -188,7 +188,14 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("Remote Developer Control Plane", page.text)
 
+    def test_public_session_creation_is_rate_limited_without_storing_ip(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        responses = [client.post("/api/remote-dev/sessions") for _ in range(7)]
+        self.assertTrue(all(item.status_code == 200 for item in responses[:6]))
+        self.assertEqual(responses[6].status_code, 429)
+
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -23,6 +23,7 @@ MAX_MESSAGE_CHARS = 1200
 MAX_MEDIA_BYTES = 5 * 1024 * 1024
 SESSION_TTL = timedelta(minutes=30)
 MAX_ACTIONS_PER_SESSION = 3
+MAX_ACTIVE_SESSIONS = 200
 ALLOWED_MEDIA = {
     "audio/ogg": "audio",
     "audio/webm": "audio",
@@ -137,6 +138,11 @@ class DemoRegistry:
             expires_at=(now + SESSION_TTL).isoformat(),
         )
         with self._lock:
+            for session_id, existing in list(self._sessions.items()):
+                if datetime.fromisoformat(existing.expires_at) <= now:
+                    del self._sessions[session_id]
+            if len(self._sessions) >= MAX_ACTIVE_SESSIONS:
+                raise PermissionError("demo_capacity_reached")
             self._sessions[session.session_id] = session
         return session, token
 
