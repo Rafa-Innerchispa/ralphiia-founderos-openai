@@ -30,7 +30,7 @@ async def main() -> int:
     service = RemoteDevDemoService(
         DemoRegistry(),
         McpCoordinationGateway(os.getenv("REMOTE_DEV_MCP_URL", "http://127.0.0.1:8102/mcp"), api_key),
-        CodexScenarioExecutor(root, codex_bin, enabled=True, timeout=240),
+        CodexScenarioExecutor(root, codex_bin, enabled=True, timeout=240, model=os.getenv("REMOTE_DEV_MODEL", "gpt-5.6-sol")),
         LocalMediaProcessor(root / "media", os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")),
     )
     session = service.create_session()
@@ -58,6 +58,9 @@ async def main() -> int:
         "commit": action.get("commit"),
         "tests": action.get("tests"),
         "summary": action.get("summary"),
+        "model_requested": action.get("model_requested"),
+        "codex_thread_id": action.get("codex_thread_id"),
+        "usage": action.get("usage"),
         "latency_ms": action.get("latency_ms"),
         "status": action.get("status"),
         "event_count": len(completed["snapshot"]["events"]),

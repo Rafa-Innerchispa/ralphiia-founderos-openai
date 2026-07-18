@@ -54,6 +54,9 @@ class FakeExecutor:
             tests="1 passed",
             summary="Cambio sintético verificado.",
             latency_ms=42.5,
+            model_requested="gpt-5.6-sol",
+            codex_thread_id="019f-fixture",
+            usage={"input_tokens": 100, "output_tokens": 20},
         )
 
 
@@ -175,6 +178,9 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(result["action"]["status"], "completed")
         self.assertEqual(result["action"]["commit"], "abc1234")
         self.assertEqual(result["action"]["tests"], "1 passed")
+        self.assertEqual(result["action"]["model_requested"], "gpt-5.6-sol")
+        self.assertEqual(result["action"]["codex_thread_id"], "019f-fixture")
+        self.assertEqual(result["action"]["usage"]["input_tokens"], 100)
         self.assertEqual(self.coordination.started, ["ops_fixture_1"])
         self.assertEqual(self.coordination.finished[0][1], True)
 
@@ -208,6 +214,15 @@ class RemoteDevDemoTest(unittest.TestCase):
                 10,
             )
         self.assertEqual(result.stdout.strip(), "None")
+
+    def test_codex_jsonl_metadata_is_extracted(self):
+        events = (
+            '{"type":"thread.started","thread_id":"019f-test"}\n'
+            '{"type":"turn.completed","usage":{"input_tokens":321,"output_tokens":45}}\n'
+        )
+        thread_id, usage = CodexScenarioExecutor._codex_metadata(events)
+        self.assertEqual(thread_id, "019f-test")
+        self.assertEqual(usage, {"input_tokens": 321, "output_tokens": 45})
 
     def test_minimal_server_exposes_only_demo_with_security_headers(self):
         from quoteops.remote_dev_server import app as minimal_app

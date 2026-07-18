@@ -18,6 +18,7 @@ class DemoSettings:
     remote_dev_execute_codex = os.getenv("REMOTE_DEV_EXECUTE_CODEX", "0").lower() in {"1", "true", "yes", "on"}
     remote_dev_workspace_root = os.getenv("REMOTE_DEV_WORKSPACE_ROOT", "/home/rlopez/worktrees/ralfia-public-demo")
     remote_dev_timeout_seconds = int(os.getenv("REMOTE_DEV_TIMEOUT_SECONDS", "240"))
+    remote_dev_model = os.getenv("REMOTE_DEV_MODEL", "gpt-5.6-sol")
     remote_dev_whisper_url = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")
 
 

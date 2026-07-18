@@ -72,6 +72,7 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
         codex_bin,
         enabled=bool(getattr(settings, "remote_dev_execute_codex", False)),
         timeout=int(getattr(settings, "remote_dev_timeout_seconds", 240)),
+        model=str(getattr(settings, "remote_dev_model", "gpt-5.6-sol")),
     )
     media = LocalMediaProcessor(
         workspace_root / "media",

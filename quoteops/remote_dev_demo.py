@@ -399,6 +399,9 @@ class ExecutionResult:
     tests: str
     summary: str
     latency_ms: float
+    model_requested: str | None = None
+    codex_thread_id: str | None = None
+    usage: dict[str, int] = field(default_factory=dict)
 
 
 class ScenarioExecutor(Protocol):
@@ -406,11 +409,31 @@ class ScenarioExecutor(Protocol):
 
 
 class CodexScenarioExecutor:
-    def __init__(self, root: Path, codex_bin: str, *, enabled: bool = False, timeout: int = 240) -> None:
+    def __init__(self, root: Path, codex_bin: str, *, enabled: bool = False, timeout: int = 240, model: str = "gpt-5.6-sol") -> None:
         self.root = root.resolve()
         self.codex_bin = codex_bin
         self.enabled = enabled
         self.timeout = min(max(timeout, 30), 300)
+        self.model = model
+
+    @staticmethod
+    def _codex_metadata(events: str) -> tuple[str | None, dict[str, int]]:
+        thread_id = None
+        usage: dict[str, int] = {}
+        for line in (events or "").splitlines():
+            try:
+                event = json.loads(line)
+            except (TypeError, ValueError):
+                continue
+            if event.get("type") == "thread.started":
+                thread_id = str(event.get("thread_id") or "") or None
+            elif event.get("type") == "turn.completed" and isinstance(event.get("usage"), dict):
+                usage = {
+                    str(key): int(value)
+                    for key, value in event["usage"].items()
+                    if isinstance(value, (int, float))
+                }
+        return thread_id, usage
 
     @staticmethod
     def _run(command: list[str], cwd: Path, timeout: int = 60) -> subprocess.CompletedProcess[str]:
@@ -495,6 +518,8 @@ class CodexScenarioExecutor:
             self.codex_bin,
             "exec",
             "--ignore-user-config",
+            "-m",
+            self.model,
             "-c",
             "shell_environment_policy.inherit=none",
             "--sandbox",
@@ -509,6 +534,7 @@ class CodexScenarioExecutor:
         ]
         try:
             agent = self._run(command, workspace, self.timeout)
+            codex_thread_id, usage = self._codex_metadata(agent.stdout)
             status = self._run(["git", "status", "--porcelain"], workspace)
             changed = bool(status.stdout.strip())
             tests = self._run(
@@ -529,13 +555,16 @@ class CodexScenarioExecutor:
             if agent.returncode == 0 and not changed:
                 summary = f"no_verifiable_change: {summary}"[:1600]
             return ExecutionResult(
-                ok,
-                "completed" if ok else "failed",
-                job_id,
-                commit,
-                test_summary,
-                summary,
-                (perf_counter() - started) * 1000,
+                ok=ok,
+                status="completed" if ok else "failed",
+                job_id=job_id,
+                commit=commit,
+                tests=test_summary,
+                summary=summary,
+                latency_ms=(perf_counter() - started) * 1000,
+                model_requested=self.model,
+                codex_thread_id=codex_thread_id,
+                usage=usage,
             )
         except subprocess.TimeoutExpired:
             return ExecutionResult(
@@ -717,12 +746,18 @@ class RemoteDevDemoService:
             tests=result.tests,
             summary=result.summary,
             latency_ms=round(result.latency_ms, 2),
+            model_requested=result.model_requested,
+            codex_thread_id=result.codex_thread_id,
+            usage=result.usage,
             finished_at=_now(),
         )
         evidence = {
             "job_id": result.job_id,
             "commit": result.commit or "none",
             "tests": result.tests,
+            "model_requested": result.model_requested or "not_reported",
+            "codex_thread_id": result.codex_thread_id or "not_reported",
+            "usage": result.usage,
         }
         await self.coordination.finish_task(action["task_id"], ok=result.ok, evidence=evidence)
         self.registry.add_event(
