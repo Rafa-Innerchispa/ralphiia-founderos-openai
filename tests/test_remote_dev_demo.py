@@ -43,6 +43,7 @@ class FakeCoordination:
 class FakeExecutor:
     def __init__(self):
         self.calls = []
+        self.model = "gpt-5.6-sol"
 
     def run(self, session_id, scenario):
         self.calls.append((session_id, scenario))
@@ -103,6 +104,7 @@ class RemoteDevDemoTest(unittest.TestCase):
 
     def test_session_is_ephemeral_and_exposes_only_demo_scenarios(self):
         self.assertEqual(self.session["coordination_mode"], "mcp_test")
+        self.assertEqual(self.session["model_requested"], "gpt-5.6-sol")
         self.assertTrue(self.session["actor_id"].startswith("demo_user_"))
         serialized = str(self.session).lower()
         self.assertNotIn("private_personal", serialized)
@@ -192,6 +194,7 @@ class RemoteDevDemoTest(unittest.TestCase):
         capabilities = client.get("/api/remote-dev/capabilities")
         self.assertEqual(capabilities.status_code, 200)
         payload = capabilities.json()
+        self.assertEqual(payload["model_requested"], "gpt-5.6-sol")
         self.assertFalse(payload["production_access"])
         self.assertFalse(payload["arbitrary_shell"])
         self.assertFalse(payload["sudo"])
@@ -232,6 +235,7 @@ class RemoteDevDemoTest(unittest.TestCase):
         health = client.get("/healthz")
         self.assertEqual(health.status_code, 200)
         self.assertFalse(health.json()["private_data"])
+        self.assertEqual(health.json()["model_requested"], "gpt-5.6-sol")
         page = client.get("/remote-dev-demo")
         self.assertEqual(page.status_code, 200)
         self.assertEqual(page.headers["x-content-type-options"], "nosniff")

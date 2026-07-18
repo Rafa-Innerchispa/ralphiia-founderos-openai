@@ -99,6 +99,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
                 "transport": "whatsapp_ui_emulator",
                 "execution": "real_when_approved",
                 "coordination": demo.coordination.mode,
+                "model_requested": getattr(demo.executor, "model", None),
                 "private_data": False,
                 "production_access": False,
                 "arbitrary_shell": False,

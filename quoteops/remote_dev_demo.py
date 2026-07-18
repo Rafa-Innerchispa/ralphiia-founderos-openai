@@ -610,6 +610,7 @@ class RemoteDevDemoService:
             "session_token": token,
             "expires_at": session.expires_at,
             "coordination_mode": self.coordination.mode,
+            "model_requested": getattr(self.executor, "model", None),
             "scenarios": [asdict(item) for item in SCENARIOS.values()],
         }
 

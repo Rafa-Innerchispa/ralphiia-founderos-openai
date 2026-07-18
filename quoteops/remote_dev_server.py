@@ -55,6 +55,7 @@ async def healthz() -> JSONResponse:
             "environment": "isolated_demo",
             "mcp": DemoSettings.remote_dev_demo_mode == "mcp",
             "codex": DemoSettings.remote_dev_execute_codex,
+            "model_requested": DemoSettings.remote_dev_model,
             "private_data": False,
         }
     )
