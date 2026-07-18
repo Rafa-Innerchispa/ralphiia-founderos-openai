@@ -209,6 +209,18 @@ class RemoteDevDemoTest(unittest.TestCase):
             )
         self.assertEqual(result.stdout.strip(), "None")
 
+    def test_minimal_server_exposes_only_demo_with_security_headers(self):
+        from quoteops.remote_dev_server import app as minimal_app
+
+        client = TestClient(minimal_app)
+        health = client.get("/healthz")
+        self.assertEqual(health.status_code, 200)
+        self.assertFalse(health.json()["private_data"])
+        page = client.get("/remote-dev-demo")
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(client.get("/docs").status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()
