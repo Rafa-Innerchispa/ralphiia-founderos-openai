@@ -9,3 +9,4 @@ openai>=1.40.0
 rapidocr_onnxruntime>=1.4.4
 Pillow>=10.0.0
 PyMuPDF>=1.24.0,<2
+fastmcp>=3.4.2,<4

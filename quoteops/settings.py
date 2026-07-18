@@ -49,6 +49,19 @@ class Settings(BaseModel):
         "yes",
         "on",
     }
+    remote_dev_demo_enabled: bool = os.getenv("REMOTE_DEV_DEMO_ENABLED", "0").lower() in {
+        "1", "true", "yes", "on"
+    }
+    remote_dev_demo_mode: str = os.getenv("REMOTE_DEV_DEMO_MODE", "offline")
+    remote_dev_mcp_url: str = os.getenv("REMOTE_DEV_MCP_URL", "http://127.0.0.1:8102/mcp")
+    remote_dev_mcp_api_key: str = os.getenv("REMOTE_DEV_MCP_API_KEY", "")
+    remote_dev_codex_bin: str = os.getenv("REMOTE_DEV_CODEX_BIN", "")
+    remote_dev_execute_codex: bool = os.getenv("REMOTE_DEV_EXECUTE_CODEX", "0").lower() in {
+        "1", "true", "yes", "on"
+    }
+    remote_dev_workspace_root: str = os.getenv("REMOTE_DEV_WORKSPACE_ROOT", "/tmp/ralfia-remote-dev-demo")
+    remote_dev_timeout_seconds: int = int(os.getenv("REMOTE_DEV_TIMEOUT_SECONDS", "240"))
+    remote_dev_whisper_url: str = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9000")
 
 
 @lru_cache(maxsize=1)

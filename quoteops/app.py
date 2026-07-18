@@ -58,9 +58,12 @@ from quoteops.operations_dashboard import OperationsDashboardService
 from quoteops.public_progress import PublicProgressFeed
 from quoteops.reuse_catalog import reuse_summary
 from quoteops.settings import get_settings
+from quoteops.remote_dev_api import build_remote_dev_router
 
 app = FastAPI(title="RalphiIA QuoteOps", version="0.8.0")
 settings = get_settings()
+if settings.remote_dev_demo_enabled:
+    app.include_router(build_remote_dev_router(settings))
 _identity_service: CustomerIdentityService | None = None
 _execution_service = QuoteExecutionService(settings)
 _channel_router = ChannelIntakeRouter(settings.quoteops_webhook_secret)
