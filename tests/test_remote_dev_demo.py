@@ -183,6 +183,7 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(result["action"]["usage"]["input_tokens"], 100)
         self.assertEqual(self.coordination.started, ["ops_fixture_1"])
         self.assertEqual(self.coordination.finished[0][1], True)
+        self.assertEqual(self.coordination.finished[0][2]["status"], "PASS")
 
     def test_api_never_exposes_production_or_arbitrary_shell(self):
         app = FastAPI()

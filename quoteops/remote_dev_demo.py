@@ -491,6 +491,7 @@ class CodexScenarioExecutor:
                 "        self.assertIn('worker', text.lower())\n",
                 encoding="utf-8",
             )
+        (workspace / ".gitignore").write_text("__pycache__/\n*.py[cod]\n", encoding="utf-8")
         self._run(["git", "init", "-q"], workspace)
         self._run(["git", "config", "user.email", "demo@ralfia.local"], workspace)
         self._run(["git", "config", "user.name", "RalfIA Demo"], workspace)
@@ -752,6 +753,7 @@ class RemoteDevDemoService:
             finished_at=_now(),
         )
         evidence = {
+            "status": "PASS" if result.ok else "FAIL",
             "job_id": result.job_id,
             "commit": result.commit or "none",
             "tests": result.tests,
