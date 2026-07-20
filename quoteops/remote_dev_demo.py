@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import hmac
+import base64
 import json
 import os
 from pathlib import Path
@@ -133,7 +134,7 @@ SCENARIOS: dict[str, DemoScenario] = {
     ),
     "email_triage": DemoScenario(
         scenario_id="email_triage",
-        label="Revisar correos demo",
+        label="Revisar correos",
         agent="codex",
         task_title="FounderOS — Resumir correo y proponer respuesta",
         fixed_prompt="Lee email_fixture.json y crea EMAIL_SUMMARY.md con subject, resumen, posibles acciones y un borrador de respuesta sin enviar nada. Ejecuta pruebas.",
@@ -371,9 +372,17 @@ class MediaResult:
 
 
 class LocalMediaProcessor:
-    def __init__(self, root: Path, whisper_url: str = "http://127.0.0.1:9001") -> None:
+    def __init__(
+        self,
+        root: Path,
+        whisper_url: str = "http://127.0.0.1:9001",
+        vision_url: str = "http://127.0.0.1:11434",
+        vision_model: str = "qwen2.5vl:7b",
+    ) -> None:
         self.root = root.resolve()
         self.whisper_url = whisper_url.rstrip("/")
+        self.vision_url = vision_url.rstrip("/")
+        self.vision_model = vision_model.strip() or "qwen2.5vl:7b"
 
     def process(self, data: bytes, mimetype: str) -> MediaResult:
         mime = str(mimetype or "").split(";", 1)[0].lower().strip()
@@ -390,16 +399,64 @@ class LocalMediaProcessor:
             path = Path(handle.name)
         try:
             if kind == "image":
-                proc = subprocess.run(
-                    ["tesseract", str(path), "stdout", "-l", os.getenv("OCR_LANG", "spa+eng")],
-                    capture_output=True,
-                    text=True,
-                    timeout=45,
-                    check=False,
-                )
-                if proc.returncode != 0:
-                    raise RuntimeError("local_ocr_unavailable")
-                return MediaResult(kind, mime, checksum, "local_tesseract", proc.stdout.strip(), "processed")
+                ocr_text = ""
+                try:
+                    proc = subprocess.run(
+                        ["tesseract", str(path), "stdout", "-l", os.getenv("OCR_LANG", "spa+eng")],
+                        capture_output=True,
+                        text=True,
+                        timeout=45,
+                        check=False,
+                    )
+                    if proc.returncode == 0:
+                        ocr_text = (proc.stdout or "").strip()
+                except Exception:
+                    ocr_text = ""
+                try:
+                    import httpx
+
+                    image_bytes = path.read_bytes()
+                    if len(image_bytes) > 2_500_000:
+                        try:
+                            from PIL import Image
+                            import io
+
+                            with Image.open(path) as image:
+                                image = image.convert("RGB")
+                                image.thumbnail((1024, 1024))
+                                buffer = io.BytesIO()
+                                image.save(buffer, format="JPEG", quality=84, optimize=True)
+                                image_bytes = buffer.getvalue()
+                        except Exception:
+                            pass
+                    prompt = (
+                        "Describe en español la imagen de forma natural para Rafael. "
+                        "Explica qué se ve, qué texto parece haber y qué dudas tienes. "
+                        "No inventes datos exactos como direcciones, nombres o números si no son legibles. "
+                        "Si algo no se distingue, dilo claramente. "
+                    )
+                    if ocr_text:
+                        prompt += f"OCR auxiliar no confiable: {ocr_text[:1200]}"
+                    response = httpx.post(
+                        f"{self.vision_url}/api/generate",
+                        json={
+                            "model": self.vision_model,
+                            "prompt": prompt,
+                            "images": [base64.b64encode(image_bytes).decode()],
+                            "stream": False,
+                        },
+                        timeout=90,
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    vision_text = str(payload.get("response") or "").strip()
+                    if vision_text:
+                        return MediaResult(kind, mime, checksum, f"local_ollama_vision:{self.vision_model}", vision_text, "processed")
+                except Exception:
+                    pass
+                if ocr_text:
+                    return MediaResult(kind, mime, checksum, "local_tesseract", ocr_text, "processed")
+                return MediaResult(kind, mime, checksum, "local_media", "No pude extraer una descripción confiable de la imagen.", "partial")
 
             ffmpeg = shutil.which("ffmpeg")
             if not ffmpeg:
@@ -427,7 +484,7 @@ class LocalMediaProcessor:
                 kind,
                 mime,
                 checksum,
-                "local_whisper",
+                "transcripcion_local",
                 str(payload.get("text") or "").strip(),
                 "processed",
             )
@@ -860,13 +917,13 @@ class RemoteDevDemoService:
         if str(lang or "es").lower().startswith("en"):
             if media_result.kind == "image":
                 reply = "I reviewed the attached image. "
-                reply += (f"Readable text/content I could extract: {derived[:900]}" if derived else "I could not extract clear text from it here. Tell me what part you want me to inspect.")
+                reply += (f"Here is what I can say: {derived[:1200]}" if derived else "I could not identify it reliably here. Tell me what part you want me to inspect.")
             else:
                 reply = f"I transcribed the audio: {derived[:900]}" if derived else "I received the audio, but I could not transcribe clear speech."
         else:
             if media_result.kind == "image":
                 reply = "Revisé la imagen adjunta. "
-                reply += (f"Texto/contenido legible que pude extraer: {derived[:900]}" if derived else "No pude extraer texto claro aquí. Si quieres, dime qué zona debo revisar.")
+                reply += (f"Esto es lo que puedo decir: {derived[:1200]}" if derived else "No pude identificarla con confianza aquí. Si quieres, dime qué zona debo revisar.")
             else:
                 reply = f"Transcribí el audio: {derived[:900]}" if derived else "Recibí el audio, pero no pude transcribir voz clara."
         self.registry.add_event(

@@ -9,7 +9,7 @@ from threading import RLock
 from time import monotonic
 from typing import Any
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -71,6 +71,16 @@ class DemoRateLimiter:
             recent.append(now)
             self._hits[digest] = recent
             return True
+
+
+def _session_token_header(
+    x_founderos_session_token: str | None = Header(None, alias="X-FounderOS-Session-Token"),
+    x_legacy_session_token: str | None = Header(None, alias="X-Demo-Session-Token"),
+) -> str:
+    token = (x_founderos_session_token or x_legacy_session_token or "").strip()
+    if not token:
+        raise HTTPException(status_code=403, detail="founderos_session_token_required")
+    return token
 
 
 def _client_key(request: Request) -> str:
@@ -202,6 +212,8 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
     media = LocalMediaProcessor(
         workspace_root / "media",
         whisper_url=str(getattr(settings, "remote_dev_whisper_url", "http://127.0.0.1:9001")),
+        vision_url=str(getattr(settings, "remote_dev_vision_url", "http://127.0.0.1:11434")),
+        vision_model=str(getattr(settings, "remote_dev_vision_model", "qwen2.5vl:7b")),
     )
     return RemoteDevDemoService(
         DemoRegistry(),
@@ -303,7 +315,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         request: Request,
         session_id: str,
         payload: ChatRequest,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":chat", limit=60, window_seconds=600):
@@ -331,7 +343,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         message: str = Form(""),
         lang: str = Form("es"),
         media: UploadFile = File(...),
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":media-chat", limit=30, window_seconds=600):
@@ -364,7 +376,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         scenario_id: str = Form(...),
         message: str = Form(""),
         media: UploadFile | None = File(None),
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":action", limit=30, window_seconds=600):
@@ -394,7 +406,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         session_id: str,
         action_id: str,
         approval: ApprovalRequest,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(http_request) + ":action", limit=30, window_seconds=600):
@@ -412,7 +424,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     @router.get("/api/remote-dev/sessions/{session_id}")
     async def remote_dev_session(
         session_id: str,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             return JSONResponse({"ok": True, "snapshot": demo.snapshot(session_id, session_token)})
@@ -425,7 +437,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         request: Request,
         session_id: str,
         media: UploadFile = File(...),
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":media", limit=20, window_seconds=600):
@@ -446,7 +458,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     async def remote_dev_owner_unlock(
         session_id: str,
         payload: OwnerUnlockRequest,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             return JSONResponse(demo.unlock_owner(session_id, session_token, payload.code))
@@ -459,7 +471,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         request: Request,
         session_id: str,
         payload: DailyMemoryRequest,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":memory", limit=20, window_seconds=600):
@@ -517,7 +529,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         request: Request,
         session_id: str,
         payload: MemorySearchRequest,
-        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+        session_token: str = Depends(_session_token_header),
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":memory-search", limit=30, window_seconds=600):
