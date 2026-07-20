@@ -94,7 +94,6 @@ READ_ONLY_USER_SERVICES = (
     "whatsapp-automation.service",
     "ralfia-remote-dev-demo.service",
 )
-READ_ONLY_SYSTEM_SERVICES = ("nginx", "mongod")
 
 
 def _service_state(args: list[str]) -> str:
@@ -123,21 +122,22 @@ def _docker_state(container: str) -> str:
     return (value[0] if value else "unknown")[:80]
 
 
+def _clean_services(services: dict[str, str]) -> dict[str, str]:
+    return {name: value for name, value in services.items() if value != "not_on_this_node"}
+
+
 def _safe_service_snapshot() -> dict[str, Any]:
     services: dict[str, str] = {}
     for name in READ_ONLY_USER_SERVICES:
         services[name] = _service_state(["systemctl", "--user", "is-active", name])
-    for name in READ_ONLY_SYSTEM_SERVICES:
-        services[name] = _service_state(["systemctl", "is-active", name])
     services["evolution_api"] = _docker_state("evolution_api")
-    services["evolution_api_amd"] = _docker_state("evolution_api_amd")
     services["n8n"] = _docker_state("n8n")
     services["mongodb"] = _docker_state("mongodb")
     return {
         "server": ".4",
         "host": "192.168.1.4",
         "reachable": True,
-        "services": services,
+        "services": _clean_services(services),
     }
 
 
@@ -145,8 +145,6 @@ def _remote_safe_service_snapshot(host: str, label: str) -> dict[str, Any]:
     identity = "/home/rlopez/.ssh/ralfia_peer_ops_ed25519"
     commands = {
         "ralfia-mcp.service": ["systemctl --user is-active ralfia-mcp.service"],
-        "whatsapp-automation.service": ["systemctl --user is-active whatsapp-automation.service"],
-        "evolution_api": ["docker inspect -f {{.State.Running}} evolution_api"],
         "evolution_api_amd": ["docker inspect -f {{.State.Running}} evolution_api_amd"],
         "n8n": ["docker inspect -f {{.State.Running}} n8n"],
     }
@@ -185,7 +183,7 @@ def _remote_safe_service_snapshot(host: str, label: str) -> dict[str, Any]:
         "server": label,
         "host": host,
         "reachable": any(value not in {"unavailable", "peer_ops_command_denied"} for value in services.values()),
-        "services": services,
+        "services": _clean_services(services),
         "error": "; ".join(errors)[:240] if errors else None,
     }
 
