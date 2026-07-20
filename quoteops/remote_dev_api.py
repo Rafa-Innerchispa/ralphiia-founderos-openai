@@ -291,7 +291,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     @router.post("/api/remote-dev/sessions")
     async def create_remote_dev_session(request: Request) -> JSONResponse:
         if not limiter.allow(_client_key(request) + ":session", limit=6, window_seconds=600):
-            raise HTTPException(status_code=429, detail="demo_rate_limit_reached")
+            raise HTTPException(status_code=429, detail="founderos_rate_limit_reached")
         try:
             return JSONResponse(demo.create_session())
         except PermissionError as exc:
@@ -307,7 +307,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":chat", limit=60, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             return JSONResponse(
                 demo.chat(
                     session_id,
@@ -335,7 +335,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":action", limit=30, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             media_data = await media.read(MAX_MEDIA_BYTES + 1) if media else None
             result = await demo.submit(
                 session_id,
@@ -365,7 +365,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(http_request) + ":action", limit=30, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             result = await demo.approve(session_id, session_token, action_id, approval.checkpoint)
             return JSONResponse(result, status_code=200 if result.get("ok") else 409)
         except PermissionError as exc:
@@ -396,7 +396,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":media", limit=20, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             demo.registry.require(session_id, session_token)
             media_data = await media.read(MAX_MEDIA_BYTES + 1)
             result = demo.media_processor.process(media_data, media.content_type or "")
@@ -430,7 +430,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":memory", limit=20, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             session = demo.require_owner(session_id, session_token)
             text = str(payload.message or "").strip()
             if not text:
@@ -488,7 +488,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     ) -> JSONResponse:
         try:
             if not limiter.allow(_client_key(request) + ":memory-search", limit=30, window_seconds=600):
-                raise PermissionError("demo_rate_limit_reached")
+                raise PermissionError("founderos_rate_limit_reached")
             demo.require_owner(session_id, session_token)
             result = await _call_mcp(
                 settings,

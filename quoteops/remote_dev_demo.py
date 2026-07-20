@@ -74,71 +74,71 @@ SCENARIOS: dict[str, DemoScenario] = {
         scenario_id="fix_quote_total",
         label="Corregir total de cotización y probar",
         agent="codex",
-        task_title="DEMO — Corregir cálculo seguro de total y ejecutar pruebas",
+        task_title="FounderOS — Corregir cálculo seguro de total y ejecutar pruebas",
         fixed_prompt=(
-            "Trabaja únicamente en este repositorio sintético. Implementa safe_total en "
+            "Trabaja únicamente en este workspace seguro aislado. Implementa safe_total en "
             "calculator.py para sumar valores no negativos, sin modificar test_calculator.py. "
             "Ejecuta las pruebas y resume el cambio. No accedas a red, secretos ni rutas externas."
         ),
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:repo:write", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:repo:write", "ralfia:test:run"),
     ),
     "inspect_services": DemoScenario(
         scenario_id="inspect_services",
-        label="Revisar estado de servicios demo",
+        label="Revisar estado de servicios",
         agent="codex",
-        task_title="DEMO — Inspeccionar fixture de servicios y producir diagnóstico",
+        task_title="FounderOS — Inspeccionar fixture de servicios y producir diagnóstico",
         fixed_prompt=(
-            "Analiza service_status.json en este repositorio sintético, crea DIAGNOSIS.md con "
+            "Analiza service_status.json en este workspace seguro aislado, crea DIAGNOSIS.md con "
             "hallazgos y recomendaciones, y ejecuta las pruebas. No uses red ni comandos de sistema."
         ),
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:repo:write", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:repo:write", "ralfia:test:run"),
     ),
     "server_4_status": DemoScenario(
         scenario_id="server_4_status",
         label="Ver estado servidor .4",
         agent="codex",
-        task_title="DEMO — Generar reporte seguro de estado servidor .4",
+        task_title="FounderOS — Generar reporte seguro de estado servidor .4",
         fixed_prompt="Lee servers.json y crea STATUS_REPORT.md con el estado del servidor .4, timestamp y evidence_ref. No inventes CPU/RAM. Ejecuta pruebas.",
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:status:read", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:status:read", "ralfia:test:run"),
     ),
     "server_5_status": DemoScenario(
         scenario_id="server_5_status",
         label="Ver estado servidor .5",
         agent="codex",
-        task_title="DEMO — Generar reporte seguro de estado servidor .5",
+        task_title="FounderOS — Generar reporte seguro de estado servidor .5",
         fixed_prompt="Lee servers.json y crea STATUS_REPORT.md con el estado del servidor .5, timestamp y evidence_ref. No inventes CPU/RAM. Ejecuta pruebas.",
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:status:read", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:status:read", "ralfia:test:run"),
     ),
     "daily_memory_checkin": DemoScenario(
         scenario_id="daily_memory_checkin",
         label="Guardar diario y sentimiento",
         agent="codex",
-        task_title="DEMO — Crear memoria diaria estructurada sin datos privados reales",
+        task_title="FounderOS — Crear memoria diaria estructurada con memoria privada segura",
         fixed_prompt="Lee checkin.txt y crea MEMORY_NOTE.md separando hechos, emociones, hipótesis, pendientes y privacidad sugerida. No diagnostiques. Ejecuta pruebas.",
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:memory:write", "ralfia:private_memory", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:memory:write", "ralfia:private_memory", "ralfia:test:run"),
     ),
     "devpost_snapshot": DemoScenario(
         scenario_id="devpost_snapshot",
         label="Preparar contexto Devpost",
         agent="codex",
-        task_title="DEMO — Preparar snapshot Devpost FounderOS",
+        task_title="FounderOS — Preparar snapshot Devpost FounderOS",
         fixed_prompt="Lee devpost_context.json y crea DEVPOST_BRIEF.md con links, tareas pendientes, riesgos y acciones que requieren confirmación humana. Ejecuta pruebas.",
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:read", "ralfia:write", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:read", "ralfia:write", "ralfia:test:run"),
     ),
     "email_triage": DemoScenario(
         scenario_id="email_triage",
         label="Revisar correos demo",
         agent="codex",
-        task_title="DEMO — Resumir correo y proponer respuesta",
+        task_title="FounderOS — Resumir correo y proponer respuesta",
         fixed_prompt="Lee email_fixture.json y crea EMAIL_SUMMARY.md con subject, resumen, posibles acciones y un borrador de respuesta sin enviar nada. Ejecuta pruebas.",
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
-        scopes=("ralfia:demo", "ralfia:email:read", "ralfia:test:run"),
+        scopes=("ralfia:founderos", "ralfia:email:read", "ralfia:test:run"),
     ),
 }
 
@@ -189,7 +189,7 @@ class DemoRegistry:
                 if datetime.fromisoformat(existing.expires_at) <= now:
                     del self._sessions[session_id]
             if len(self._sessions) >= MAX_ACTIVE_SESSIONS:
-                raise PermissionError("demo_capacity_reached")
+                raise PermissionError("live_capacity_reached")
             self._sessions[session.session_id] = session
         return session, token
 
@@ -197,13 +197,13 @@ class DemoRegistry:
         with self._lock:
             session = self._sessions.get(session_id)
             if not session:
-                raise PermissionError("demo_session_not_found")
+                raise PermissionError("live_session_not_found")
             expected = session.token_hash
             supplied = sha256(str(token or "").encode()).hexdigest()
             if not hmac.compare_digest(expected, supplied):
-                raise PermissionError("demo_session_token_invalid")
+                raise PermissionError("live_session_token_invalid")
             if datetime.fromisoformat(session.expires_at) <= datetime.now(timezone.utc):
-                raise PermissionError("demo_session_expired")
+                raise PermissionError("live_session_expired")
             return session
 
     def add_event(
@@ -270,7 +270,7 @@ class OfflineCoordinationGateway:
     mode = "offline_local_first"
 
     async def create_task(self, scenario: DemoScenario, correlation_id: str) -> dict[str, Any]:
-        return {"task_id": _safe_id("ops_demo", 7), "correlation_id": correlation_id, "status": "proposed"}
+        return {"task_id": _safe_id("ops_founderos", 7), "correlation_id": correlation_id, "status": "proposed"}
 
     async def start_task(self, task_id: str) -> None:
         return None
@@ -379,9 +379,9 @@ class LocalMediaProcessor:
         mime = str(mimetype or "").split(";", 1)[0].lower().strip()
         kind = ALLOWED_MEDIA.get(mime)
         if not kind:
-            raise ValueError("demo_media_mime_not_allowed")
+            raise ValueError("live_media_mime_not_allowed")
         if len(data) > MAX_MEDIA_BYTES:
-            raise ValueError("demo_media_size_limit_exceeded")
+            raise ValueError("live_media_size_limit_exceeded")
         checksum = sha256(data).hexdigest()
         self.root.mkdir(parents=True, exist_ok=True)
         suffix = {"audio": ".input", "image": ".image"}[kind]
@@ -506,7 +506,7 @@ class CodexScenarioExecutor:
         self.root.mkdir(parents=True, exist_ok=True)
         workspace = (self.root / session_id / scenario.scenario_id).resolve()
         if self.root not in workspace.parents:
-            raise RuntimeError("demo_workspace_escape_rejected")
+            raise RuntimeError("live_workspace_escape_rejected")
         if workspace.exists():
             shutil.rmtree(workspace)
         workspace.mkdir(parents=True)
@@ -541,15 +541,15 @@ class CodexScenarioExecutor:
             fixtures = {
                 "server_4_status": (
                     "servers.json",
-                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "demo-health-primary", "server": ".4", "services": {"Panel": "active/up", "MCP": "active/up", "WhatsApp": "active/up"}}, indent=2),
+                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "founderos-health-primary", "server": ".4", "services": {"Panel": "active/up", "MCP": "active/up", "WhatsApp": "active/up"}}, indent=2),
                     "STATUS_REPORT.md",
-                    ["'.4'", "'demo-health-primary'"],
+                    ["'.4'", "'founderos-health-primary'"],
                 ),
                 "server_5_status": (
                     "servers.json",
-                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "demo-health-amd", "server": ".5", "services": {"Panel": "active/up", "MCP": "active/up", "Evolution API": "active/up"}}, indent=2),
+                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "founderos-health-amd", "server": ".5", "services": {"Panel": "active/up", "MCP": "active/up", "Evolution API": "active/up"}}, indent=2),
                     "STATUS_REPORT.md",
-                    ["'.5'", "'demo-health-amd'"],
+                    ["'.5'", "'founderos-health-amd'"],
                 ),
                 "daily_memory_checkin": (
                     "checkin.txt",
@@ -559,13 +559,13 @@ class CodexScenarioExecutor:
                 ),
                 "devpost_snapshot": (
                     "devpost_context.json",
-                    json.dumps({"project": "RalphiIA FounderOS", "devpost": "https://devpost.com/software/ralphiia-quoteops", "demo": "https://demo.pcdoctor.ai/remote-dev-demo", "github": "https://github.com/Rafa-Innerchispa/ralphiia-founderos-openai"}, indent=2),
+                    json.dumps({"project": "RalphiIA FounderOS", "devpost": "https://devpost.com/software/ralphiia-quoteops", "site": "https://demo.pcdoctor.ai/founderos", "github": "https://github.com/Rafa-Innerchispa/ralphiia-founderos-openai"}, indent=2),
                     "DEVPOST_BRIEF.md",
                     ["'devpost.com/software/ralphiia-quoteops'", "'github.com/rafa-innerchispa/ralphiia-founderos-openai'"],
                 ),
                 "email_triage": (
                     "email_fixture.json",
-                    json.dumps({"subject": "Demo: revisar propuesta antes del viaje", "from": "cliente-demo@example.com", "body": "¿Puedes confirmar alcance y fecha de respuesta?"}, indent=2),
+                    json.dumps({"subject": "Demo: revisar propuesta antes del viaje", "from": "cliente@example.com", "body": "¿Puedes confirmar alcance y fecha de respuesta?"}, indent=2),
                     "EMAIL_SUMMARY.md",
                     ["'subject'", "'resumen'", "'borrador'"],
                 ),
@@ -573,9 +573,9 @@ class CodexScenarioExecutor:
             fixture_name, fixture_body, output_name, expected = fixtures[scenario.scenario_id]
             (workspace / fixture_name).write_text(fixture_body, encoding="utf-8")
             assertions = "\n".join(f"        self.assertIn({needle}, text)" for needle in expected)
-            (workspace / "test_demo_output.py").write_text(
+            (workspace / "test_founderos_output.py").write_text(
                 "from pathlib import Path\nimport unittest\n\n"
-                "class DemoOutputTest(unittest.TestCase):\n"
+                "class FounderOSOutputTest(unittest.TestCase):\n"
                 "    def test_expected_output_exists(self):\n"
                 f"        text = Path('{output_name}').read_text().lower()\n"
                 f"{assertions}\n",
@@ -583,8 +583,8 @@ class CodexScenarioExecutor:
             )
         (workspace / ".gitignore").write_text("__pycache__/\n*.py[cod]\n", encoding="utf-8")
         self._run(["git", "init", "-q"], workspace)
-        self._run(["git", "config", "user.email", "demo@ralfia.local"], workspace)
-        self._run(["git", "config", "user.name", "RalfIA Demo"], workspace)
+        self._run(["git", "config", "user.email", "founderos@ralfia.local"], workspace)
+        self._run(["git", "config", "user.name", "RalfIA FounderOS"], workspace)
         self._run(["git", "add", "."], workspace)
         self._run(["git", "commit", "-qm", "Synthetic fixture"], workspace)
         return workspace
@@ -636,7 +636,7 @@ class CodexScenarioExecutor:
             ok = agent.returncode == 0 and changed and tests.returncode == 0
             if ok:
                 self._run(["git", "add", "."], workspace)
-                self._run(["git", "commit", "-qm", f"Demo execution {job_id}"], workspace)
+                self._run(["git", "commit", "-qm", f"FounderOS execution {job_id}"], workspace)
                 commit = self._run(["git", "rev-parse", "--short", "HEAD"], workspace).stdout.strip()
             else:
                 commit = None
@@ -757,7 +757,7 @@ class RemoteDevDemoService:
         session = self.registry.require(session_id, token)
         request_id = str(request_id or "").strip()[:100]
         if not request_id:
-            raise ValueError("demo_request_id_required")
+            raise ValueError("live_request_id_required")
         clean_message = str(message or "").strip()[:MAX_MESSAGE_CHARS]
         if not clean_message:
             raise ValueError("message_required")
@@ -770,7 +770,7 @@ class RemoteDevDemoService:
             intent = "memory_context"
         else:
             intent = "conversation"
-        message_id = _safe_id("chat_demo", 8)
+        message_id = _safe_id("chat_live", 8)
         correlation_id = f"chat-{sha256(f'{session_id}:{request_id}:chat'.encode()).hexdigest()[:16]}"
         self.registry.add_event(
             session,
@@ -830,18 +830,18 @@ class RemoteDevDemoService:
         started = perf_counter()
         session = self.registry.require(session_id, token)
         if len(session.actions) >= MAX_ACTIONS_PER_SESSION:
-            raise PermissionError("demo_session_action_limit_reached")
+            raise PermissionError("live_session_action_limit_reached")
         request_id = str(request_id or "").strip()[:100]
         if not request_id:
-            raise ValueError("demo_request_id_required")
+            raise ValueError("live_request_id_required")
         if request_id in session.idempotency:
             action = session.actions[session.idempotency[request_id]]
             return {"ok": True, "idempotent": True, "action": self._public_action(action)}
         scenario = SCENARIOS.get(scenario_id)
         if not scenario:
-            raise ValueError("demo_scenario_not_allowed")
+            raise ValueError("live_scenario_not_allowed")
         clean_message = str(message or "").strip()[:MAX_MESSAGE_CHARS]
-        message_id = _safe_id("wamid_demo", 8)
+        message_id = _safe_id("wamid_live", 8)
         correlation_id = f"demo-{sha256(f'{session_id}:{request_id}:{scenario_id}'.encode()).hexdigest()[:16]}"
         self.registry.add_event(
             session,
@@ -918,12 +918,12 @@ class RemoteDevDemoService:
         session = self.registry.require(session_id, token)
         action = session.actions.get(action_id)
         if not action:
-            raise ValueError("demo_action_not_found")
+            raise ValueError("live_action_not_found")
         if action["status"] != "awaiting_approval":
             return {"ok": action["status"] == "completed", "idempotent": True, "action": self._public_action(action)}
         supplied = sha256(str(checkpoint or "").encode()).hexdigest()
         if not hmac.compare_digest(action["checkpoint_hash"], supplied):
-            raise PermissionError("demo_checkpoint_invalid")
+            raise PermissionError("live_checkpoint_invalid")
         scenario = SCENARIOS[action["scenario_id"]]
         action["status"] = "running"
         self.registry.add_event(
