@@ -105,7 +105,7 @@ class RemoteDevDemoTest(unittest.TestCase):
     def test_session_is_ephemeral_and_exposes_only_demo_scenarios(self):
         self.assertEqual(self.session["coordination_mode"], "mcp_test")
         self.assertEqual(self.session["model_requested"], "gpt-5.6-sol")
-        self.assertTrue(self.session["actor_id"].startswith("demo_user_"))
+        self.assertTrue(self.session["actor_id"].startswith("rafael_web_"))
         serialized = str(self.session).lower()
         self.assertNotIn("private_personal", serialized)
         self.assertNotIn("production", serialized)
@@ -143,6 +143,15 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertIn("chat_message_received", event_types)
         self.assertIn("intent_classified", event_types)
         self.assertNotIn("ops_task_created", event_types)
+
+    def test_founderos_api_aliases_work(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        created = client.post("/api/founderos/sessions")
+        self.assertEqual(created.status_code, 200)
+        live = client.get("/api/founderos/live-status")
+        self.assertEqual(live.status_code, 200)
 
     def test_api_chat_endpoint_returns_conversational_reply(self):
         app = FastAPI()
@@ -278,12 +287,13 @@ class RemoteDevDemoTest(unittest.TestCase):
         client = TestClient(minimal_app)
         health = client.get("/healthz")
         self.assertEqual(health.status_code, 200)
-        self.assertFalse(health.json()["private_data"])
+        self.assertIn("memory_available", health.json())
         self.assertEqual(health.json()["model_requested"], "gpt-5.6-sol")
         page = client.get("/remote-dev-demo")
         self.assertEqual(page.status_code, 200)
         self.assertEqual(page.headers["x-content-type-options"], "nosniff")
         self.assertEqual(client.get("/docs").status_code, 404)
+        self.assertEqual(client.get("/founderos").status_code, 200)
 
 
 if __name__ == "__main__":

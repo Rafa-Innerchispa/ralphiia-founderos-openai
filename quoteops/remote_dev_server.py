@@ -21,10 +21,11 @@ class DemoSettings:
     remote_dev_model = os.getenv("REMOTE_DEV_MODEL", "gpt-5.6-sol")
     remote_dev_whisper_url = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")
     remote_dev_owner_code_sha256 = os.getenv("REMOTE_DEV_OWNER_CODE_SHA256", "")
+    remote_dev_auto_owner_memory = os.getenv("REMOTE_DEV_AUTO_OWNER_MEMORY", "1").lower() in {"1", "true", "yes", "on"}
 
 
 app = FastAPI(
-    title="RalfIA Remote Developer Demo",
+    title="RalfIA FounderOS",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -52,16 +53,16 @@ async def healthz() -> JSONResponse:
     return JSONResponse(
         {
             "ok": True,
-            "service": "ralfia-remote-dev-demo",
-            "environment": "isolated_demo",
+            "service": "ralfia-founderos",
+            "environment": "live_control_plane",
             "mcp": DemoSettings.remote_dev_demo_mode == "mcp",
             "codex": DemoSettings.remote_dev_execute_codex,
             "model_requested": DemoSettings.remote_dev_model,
-            "private_data": False,
+            "memory_available": DemoSettings.remote_dev_auto_owner_memory and bool(DemoSettings.remote_dev_owner_code_sha256),
         }
     )
 
 
 @app.get("/", include_in_schema=False)
 async def root() -> RedirectResponse:
-    return RedirectResponse("/remote-dev-demo", status_code=307)
+    return RedirectResponse("/founderos", status_code=307)

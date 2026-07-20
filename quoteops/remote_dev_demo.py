@@ -178,8 +178,8 @@ class DemoRegistry:
         token = secrets.token_urlsafe(24)
         now = datetime.now(timezone.utc)
         session = DemoSession(
-            session_id=_safe_id("demo"),
-            actor_id=_safe_id("demo_user", 5),
+            session_id=_safe_id("live"),
+            actor_id=_safe_id("rafael_web", 5),
             token_hash=sha256(token.encode()).hexdigest(),
             created_at=now.isoformat(),
             expires_at=(now + SESSION_TTL).isoformat(),
@@ -679,22 +679,34 @@ class RemoteDevDemoService:
         executor: ScenarioExecutor,
         media_processor: LocalMediaProcessor,
         owner_code_sha256: str = "",
+        auto_owner_memory: bool = False,
     ) -> None:
         self.registry = registry
         self.coordination = coordination
         self.executor = executor
         self.media_processor = media_processor
         self.owner_code_sha256 = str(owner_code_sha256 or "").strip().lower()
+        self.auto_owner_memory = bool(auto_owner_memory)
 
     def create_session(self) -> dict[str, Any]:
         session, token = self.registry.create()
+        if self.auto_owner_memory and self.owner_code_sha256:
+            session.owner_verified_at = _now()
         self.registry.add_event(
             session,
             "session_created",
             actor="ralfia",
-            tool="identity:ephemeral",
-            detail="Identidad DEMO aislada; sin acceso a datos privados ni producción.",
+            tool="identity:live-web",
+            detail="Canal web vivo iniciado; memoria y estado disponibles con operaciones seguras.",
         )
+        if session.owner_verified_at:
+            self.registry.add_event(
+                session,
+                "memory_ready",
+                actor="ralfia-memory",
+                tool="daily-life-memory",
+                detail="Daily Life Memory disponible en este canal.",
+            )
         return {
             "ok": True,
             "session_id": session.session_id,
@@ -705,7 +717,7 @@ class RemoteDevDemoService:
             "model_requested": getattr(self.executor, "model", None),
             "scenarios": [asdict(item) for item in SCENARIOS.values()],
             "personal_memory_available": bool(self.owner_code_sha256),
-            "owner_verified": False,
+            "owner_verified": bool(session.owner_verified_at),
         }
 
     def unlock_owner(self, session_id: str, token: str, code: str) -> dict[str, Any]:
@@ -721,7 +733,7 @@ class RemoteDevDemoService:
             "owner_mode_unlocked",
             actor=session.actor_id,
             tool="owner-code",
-            detail="Modo Rafael desbloqueado para guardar Daily Life Memory real vía MCP.",
+            detail="Daily Life Memory habilitada vía MCP.",
         )
         return {"ok": True, "owner_verified": True, "snapshot": self.registry.snapshot(session)}
 

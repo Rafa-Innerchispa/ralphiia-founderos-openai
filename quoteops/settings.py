@@ -63,6 +63,10 @@ class Settings(BaseModel):
     remote_dev_timeout_seconds: int = int(os.getenv("REMOTE_DEV_TIMEOUT_SECONDS", "240"))
     remote_dev_model: str = os.getenv("REMOTE_DEV_MODEL", "gpt-5.6-sol")
     remote_dev_whisper_url: str = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")
+    remote_dev_owner_code_sha256: str = os.getenv("REMOTE_DEV_OWNER_CODE_SHA256", "")
+    remote_dev_auto_owner_memory: bool = os.getenv("REMOTE_DEV_AUTO_OWNER_MEMORY", "0").lower() in {
+        "1", "true", "yes", "on"
+    }
 
 
 @lru_cache(maxsize=1)

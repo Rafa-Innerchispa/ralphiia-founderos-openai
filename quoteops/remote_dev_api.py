@@ -209,6 +209,7 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
         executor,
         media,
         owner_code_sha256=str(getattr(settings, "remote_dev_owner_code_sha256", "")),
+        auto_owner_memory=bool(getattr(settings, "remote_dev_auto_owner_memory", False)),
     )
 
 
@@ -236,10 +237,15 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     demo = service or build_remote_dev_service(settings)
     limiter = DemoRateLimiter()
 
-    @router.get("/remote-dev-demo", response_class=HTMLResponse)
-    async def remote_dev_demo_page() -> HTMLResponse:
+    @router.get("/founderos", response_class=HTMLResponse)
+    async def founderos_page() -> HTMLResponse:
         return HTMLResponse(render_remote_dev_demo())
 
+    @router.get("/remote-dev-demo", response_class=HTMLResponse)
+    async def remote_dev_legacy_page() -> HTMLResponse:
+        return HTMLResponse(render_remote_dev_demo())
+
+    @router.get("/api/founderos/live-status")
     @router.get("/api/remote-dev/live-status")
     async def remote_dev_live_status() -> JSONResponse:
         checked_at = datetime.now(timezone.utc).isoformat()
@@ -248,22 +254,23 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
                 "ok": True,
                 "checked_at": checked_at,
                 "policy": "read_only_allowlist_no_sudo_no_arbitrary_shell",
-                "layers": ["Cloudflare/demo.pcdoctor.ai", "demo service :8766", "MCP :8102", "WhatsApp automation", "MongoDB"],
+                "layers": ["Cloudflare/demo.pcdoctor.ai", "FounderOS web :8766", "MCP :8102", "WhatsApp automation", "MongoDB"],
                 "servers": [_safe_service_snapshot(), _remote_safe_service_snapshot("192.168.1.5", ".5")],
             }
         )
 
+    @router.get("/api/founderos/capabilities")
     @router.get("/api/remote-dev/capabilities")
     async def remote_dev_capabilities() -> JSONResponse:
         return JSONResponse(
             {
                 "ok": True,
-                "environment": "isolated_demo",
+                "environment": "live_control_plane",
                 "transport": "whatsapp_ui_emulator",
                 "execution": "real_when_approved",
                 "coordination": demo.coordination.mode,
                 "model_requested": getattr(demo.executor, "model", None),
-                "private_data": False,
+                "memory_available": True,
                 "production_access": False,
                 "arbitrary_shell": False,
                 "sudo": False,
@@ -280,6 +287,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             }
         )
 
+    @router.post("/api/founderos/sessions")
     @router.post("/api/remote-dev/sessions")
     async def create_remote_dev_session(request: Request) -> JSONResponse:
         if not limiter.allow(_client_key(request) + ":session", limit=6, window_seconds=600):
@@ -289,6 +297,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/chat")
     @router.post("/api/remote-dev/sessions/{session_id}/chat")
     async def remote_dev_chat(
         request: Request,
@@ -313,6 +322,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/messages")
     @router.post("/api/remote-dev/sessions/{session_id}/messages")
     async def remote_dev_message(
         request: Request,
@@ -344,6 +354,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/actions/{action_id}/approve")
     @router.post("/api/remote-dev/sessions/{session_id}/actions/{action_id}/approve")
     async def approve_remote_dev_action(
         http_request: Request,
@@ -364,6 +375,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.get("/api/founderos/sessions/{session_id}")
     @router.get("/api/remote-dev/sessions/{session_id}")
     async def remote_dev_session(
         session_id: str,
@@ -374,6 +386,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/media-preview")
     @router.post("/api/remote-dev/sessions/{session_id}/media-preview")
     async def remote_dev_media_preview(
         request: Request,
@@ -395,6 +408,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/owner-unlock")
     @router.post("/api/remote-dev/sessions/{session_id}/owner-unlock")
     async def remote_dev_owner_unlock(
         session_id: str,
@@ -406,6 +420,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/daily-memory")
     @router.post("/api/remote-dev/sessions/{session_id}/daily-memory")
     async def remote_dev_daily_memory(
         request: Request,
@@ -430,7 +445,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
                 "source": "ralfia_remote_dev_owner_mode",
                 "actor": "RAFAEL",
                 "messages": [{"role": "user", "content": text, "message_id": message_id}],
-                "metadata": {"conversation_label": payload.conversation_label, "project": payload.project, "surface": "demo.pcdoctor.ai"},
+                "metadata": {"conversation_label": payload.conversation_label, "project": payload.project, "surface": "pcdoctor.ai/founderos"},
             }
             saved = await _call_mcp(settings, "save_conversation_batch", {"payload": save_payload})
             finalized = await _call_mcp(
@@ -463,6 +478,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/daily-memory/search")
     @router.post("/api/remote-dev/sessions/{session_id}/daily-memory/search")
     async def remote_dev_daily_memory_search(
         request: Request,
