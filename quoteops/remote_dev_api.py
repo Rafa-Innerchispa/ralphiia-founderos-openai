@@ -110,33 +110,51 @@ def _safe_service_snapshot() -> dict[str, Any]:
 
 
 def _remote_safe_service_snapshot(host: str, label: str) -> dict[str, Any]:
-    remote_script = (
-        "for s in ralfia-mcp.service whatsapp-automation.service "
-        "evolution-api.service ralfia-remote-dev-demo.service; do "
-        "printf '%s=' \"$s\"; systemctl --user is-active \"$s\" 2>/dev/null || echo unknown; done; "
-        "for s in nginx mongod; do printf '%s=' \"$s\"; systemctl is-active \"$s\" 2>/dev/null || echo unknown; done"
-    )
-    try:
-        result = subprocess.run(
-            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", f"rlopez@{host}", remote_script],
-            capture_output=True,
-            text=True,
-            timeout=7,
-            check=False,
-        )
-    except Exception as exc:
-        return {"server": label, "host": host, "reachable": False, "error": type(exc).__name__, "services": {}}
+    identity = "/home/rlopez/.ssh/ralfia_peer_ops_ed25519"
+    commands = {
+        "ralfia-mcp.service": ["systemctl --user is-active ralfia-mcp.service"],
+        "whatsapp-automation.service": ["systemctl --user is-active whatsapp-automation.service"],
+        "evolution_api": ["docker inspect -f {{.State.Running}} evolution_api"],
+        "evolution_api_amd": ["docker inspect -f {{.State.Running}} evolution_api_amd"],
+        "n8n": ["docker inspect -f {{.State.Running}} n8n"],
+    }
     services: dict[str, str] = {}
-    for line in (result.stdout or "").splitlines():
-        if "=" in line:
-            key, value = line.split("=", 1)
-            services[key[:80]] = value.strip()[:80]
+    errors: list[str] = []
+    for name, command in commands.items():
+        try:
+            result = subprocess.run(
+                [
+                    "ssh",
+                    "-i",
+                    identity,
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "IdentitiesOnly=yes",
+                    "-o",
+                    "ConnectTimeout=3",
+                    f"rlopez@{host}",
+                    command[0],
+                ],
+                capture_output=True,
+                text=True,
+                timeout=7,
+                check=False,
+            )
+        except Exception as exc:
+            services[name] = "unavailable"
+            errors.append(f"{name}:{type(exc).__name__}")
+            continue
+        value = (result.stdout or result.stderr or "unknown").strip().splitlines()
+        services[name] = (value[0] if value else "unknown")[:80]
+        if result.returncode not in (0, 3):
+            errors.append(f"{name}:{services[name]}")
     return {
         "server": label,
         "host": host,
-        "reachable": result.returncode == 0,
+        "reachable": any(value not in {"unavailable", "peer_ops_command_denied"} for value in services.values()),
         "services": services,
-        "error": (result.stderr or "").strip()[:240] if result.returncode else None,
+        "error": "; ".join(errors)[:240] if errors else None,
     }
 
 
