@@ -95,12 +95,33 @@ def _service_state(args: list[str]) -> str:
     return (value[0] if value else "unknown")[:80]
 
 
+def _docker_state(container: str) -> str:
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", container],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except Exception as exc:
+        return f"unavailable:{type(exc).__name__}"
+    value = (result.stdout or "").strip().splitlines()
+    if result.returncode != 0:
+        return "not_on_this_node"
+    return (value[0] if value else "unknown")[:80]
+
+
 def _safe_service_snapshot() -> dict[str, Any]:
     services: dict[str, str] = {}
     for name in READ_ONLY_USER_SERVICES:
         services[name] = _service_state(["systemctl", "--user", "is-active", name])
     for name in READ_ONLY_SYSTEM_SERVICES:
         services[name] = _service_state(["systemctl", "is-active", name])
+    services["evolution_api"] = _docker_state("evolution_api")
+    services["evolution_api_amd"] = _docker_state("evolution_api_amd")
+    services["n8n"] = _docker_state("n8n")
+    services["mongodb"] = _docker_state("mongodb")
     return {
         "server": ".4",
         "host": "192.168.1.4",
@@ -146,7 +167,7 @@ def _remote_safe_service_snapshot(host: str, label: str) -> dict[str, Any]:
             errors.append(f"{name}:{type(exc).__name__}")
             continue
         value = (result.stdout or result.stderr or "unknown").strip().splitlines()
-        services[name] = (value[0] if value else "unknown")[:80]
+        services[name] = (value[0] if value else "not_on_this_node")[:80]
         if result.returncode not in (0, 3):
             errors.append(f"{name}:{services[name]}")
     return {
