@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from hashlib import sha256
 import shutil
@@ -26,6 +27,22 @@ from quoteops.remote_dev_frontend import render_remote_dev_demo
 
 class ApprovalRequest(BaseModel):
     checkpoint: str
+
+
+class OwnerUnlockRequest(BaseModel):
+    code: str
+
+
+class DailyMemoryRequest(BaseModel):
+    message: str
+    privacy_scope: str = "PRIVATE_PERSONAL"
+    conversation_label: str | None = None
+    project: str | None = None
+
+
+class MemorySearchRequest(BaseModel):
+    query: str
+    limit: int = 5
 
 
 class DemoRateLimiter:
@@ -78,7 +95,32 @@ def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
         workspace_root / "media",
         whisper_url=str(getattr(settings, "remote_dev_whisper_url", "http://127.0.0.1:9001")),
     )
-    return RemoteDevDemoService(DemoRegistry(), coordination, executor, media)
+    return RemoteDevDemoService(
+        DemoRegistry(),
+        coordination,
+        executor,
+        media,
+        owner_code_sha256=str(getattr(settings, "remote_dev_owner_code_sha256", "")),
+    )
+
+
+async def _call_mcp(settings: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    from fastmcp import Client
+    from fastmcp.client.transports import StreamableHttpTransport
+
+    api_key = str(getattr(settings, "remote_dev_mcp_api_key", "") or "")
+    url = str(getattr(settings, "remote_dev_mcp_url", getattr(settings, "ralfia_mcp_url", "")) or "")
+    if not api_key or not url:
+        raise RuntimeError("mcp_not_configured")
+    transport = StreamableHttpTransport(url, headers={"X-API-Key": api_key})
+    async with Client(transport, timeout=45) as client:
+        result = await client.call_tool(name, arguments, raise_on_error=False)
+    payload = result.data if isinstance(result.data, dict) else result.structured_content
+    if result.is_error or not isinstance(payload, dict):
+        raise RuntimeError(f"mcp_{name}_failed")
+    if payload.get("ok") is False:
+        raise RuntimeError(str(payload.get("error") or f"mcp_{name}_failed"))
+    return payload
 
 
 def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None = None) -> APIRouter:
@@ -186,5 +228,116 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             return JSONResponse({"ok": True, "snapshot": demo.snapshot(session_id, session_token)})
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    @router.post("/api/remote-dev/sessions/{session_id}/media-preview")
+    async def remote_dev_media_preview(
+        request: Request,
+        session_id: str,
+        media: UploadFile = File(...),
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            if not limiter.allow(_client_key(request) + ":media", limit=20, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
+            demo.registry.require(session_id, session_token)
+            media_data = await media.read(MAX_MEDIA_BYTES + 1)
+            result = demo.media_processor.process(media_data, media.content_type or "")
+            return JSONResponse({"ok": True, "media": result.__dict__})
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @router.post("/api/remote-dev/sessions/{session_id}/owner-unlock")
+    async def remote_dev_owner_unlock(
+        session_id: str,
+        payload: OwnerUnlockRequest,
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            return JSONResponse(demo.unlock_owner(session_id, session_token, payload.code))
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    @router.post("/api/remote-dev/sessions/{session_id}/daily-memory")
+    async def remote_dev_daily_memory(
+        request: Request,
+        session_id: str,
+        payload: DailyMemoryRequest,
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            if not limiter.allow(_client_key(request) + ":memory", limit=20, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
+            session = demo.require_owner(session_id, session_token)
+            text = str(payload.message or "").strip()
+            if not text:
+                raise ValueError("message_required")
+            privacy = str(payload.privacy_scope or "PRIVATE_PERSONAL").upper()
+            conversation_id = f"web-daily:{session.session_id}:{datetime.now(timezone.utc).date().isoformat()}"
+            message_id = f"webmsg_{sha256((session.session_id + text).encode()).hexdigest()[:16]}"
+            save_payload = {
+                "owner_id": "RAFAEL",
+                "conversation_id": conversation_id,
+                "privacy_scope": privacy,
+                "source": "ralfia_remote_dev_owner_mode",
+                "actor": "RAFAEL",
+                "messages": [{"role": "user", "content": text, "message_id": message_id}],
+                "metadata": {"conversation_label": payload.conversation_label, "project": payload.project, "surface": "demo.pcdoctor.ai"},
+            }
+            saved = await _call_mcp(settings, "save_conversation_batch", {"payload": save_payload})
+            finalized = await _call_mcp(
+                settings,
+                "finalize_conversation",
+                {
+                    "payload": {
+                        "owner_id": "RAFAEL",
+                        "conversation_id": conversation_id,
+                        "privacy_scope": privacy,
+                        "actor": "RAFAEL",
+                        "project": payload.project,
+                        "state_key": f"web:{privacy.lower()}",
+                    }
+                },
+            )
+            demo.registry.add_event(
+                session,
+                "daily_memory_saved",
+                actor="ralfia-mcp",
+                tool="save_conversation_batch+finalize_conversation",
+                detail="Conversación real guardada en Daily Life Memory para consulta posterior desde WhatsApp/MCP.",
+                evidence={"message_id": message_id, "correlation_id": conversation_id},
+            )
+            return JSONResponse({"ok": True, "conversation_id": conversation_id, "message_id": message_id, "save": saved, "finalize": finalized, "snapshot": demo.registry.snapshot(session)})
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @router.post("/api/remote-dev/sessions/{session_id}/daily-memory/search")
+    async def remote_dev_daily_memory_search(
+        request: Request,
+        session_id: str,
+        payload: MemorySearchRequest,
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            if not limiter.allow(_client_key(request) + ":memory-search", limit=30, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
+            demo.require_owner(session_id, session_token)
+            result = await _call_mcp(
+                settings,
+                "search_memory",
+                {"query": payload.query, "owner_id": "RAFAEL", "actor": "RAFAEL", "limit": max(1, min(payload.limit, 10))},
+            )
+            return JSONResponse({"ok": True, "result": result})
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return router

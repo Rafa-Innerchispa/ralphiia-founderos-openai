@@ -85,7 +85,7 @@ SCENARIOS: dict[str, DemoScenario] = {
     ),
     "inspect_services": DemoScenario(
         scenario_id="inspect_services",
-        label="Revisar estado de servicios",
+        label="Revisar estado de servicios demo",
         agent="codex",
         task_title="DEMO — Inspeccionar fixture de servicios y producir diagnóstico",
         fixed_prompt=(
@@ -94,6 +94,51 @@ SCENARIOS: dict[str, DemoScenario] = {
         ),
         allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
         scopes=("ralfia:demo", "ralfia:repo:write", "ralfia:test:run"),
+    ),
+    "server_4_status": DemoScenario(
+        scenario_id="server_4_status",
+        label="Ver estado servidor .4",
+        agent="codex",
+        task_title="DEMO — Generar reporte seguro de estado servidor .4",
+        fixed_prompt="Lee servers.json y crea STATUS_REPORT.md con el estado del servidor .4, timestamp y evidence_ref. No inventes CPU/RAM. Ejecuta pruebas.",
+        allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
+        scopes=("ralfia:demo", "ralfia:status:read", "ralfia:test:run"),
+    ),
+    "server_5_status": DemoScenario(
+        scenario_id="server_5_status",
+        label="Ver estado servidor .5",
+        agent="codex",
+        task_title="DEMO — Generar reporte seguro de estado servidor .5",
+        fixed_prompt="Lee servers.json y crea STATUS_REPORT.md con el estado del servidor .5, timestamp y evidence_ref. No inventes CPU/RAM. Ejecuta pruebas.",
+        allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
+        scopes=("ralfia:demo", "ralfia:status:read", "ralfia:test:run"),
+    ),
+    "daily_memory_checkin": DemoScenario(
+        scenario_id="daily_memory_checkin",
+        label="Guardar diario y sentimiento",
+        agent="codex",
+        task_title="DEMO — Crear memoria diaria estructurada sin datos privados reales",
+        fixed_prompt="Lee checkin.txt y crea MEMORY_NOTE.md separando hechos, emociones, hipótesis, pendientes y privacidad sugerida. No diagnostiques. Ejecuta pruebas.",
+        allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
+        scopes=("ralfia:demo", "ralfia:memory:write", "ralfia:private_memory", "ralfia:test:run"),
+    ),
+    "devpost_snapshot": DemoScenario(
+        scenario_id="devpost_snapshot",
+        label="Preparar contexto Devpost",
+        agent="codex",
+        task_title="DEMO — Preparar snapshot Devpost FounderOS",
+        fixed_prompt="Lee devpost_context.json y crea DEVPOST_BRIEF.md con links, tareas pendientes, riesgos y acciones que requieren confirmación humana. Ejecuta pruebas.",
+        allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
+        scopes=("ralfia:demo", "ralfia:read", "ralfia:write", "ralfia:test:run"),
+    ),
+    "email_triage": DemoScenario(
+        scenario_id="email_triage",
+        label="Revisar correos demo",
+        agent="codex",
+        task_title="DEMO — Resumir correo y proponer respuesta",
+        fixed_prompt="Lee email_fixture.json y crea EMAIL_SUMMARY.md con subject, resumen, posibles acciones y un borrador de respuesta sin enviar nada. Ejecuta pruebas.",
+        allowed_tools=("repo:read", "repo:write", "test:unittest", "git:diff", "git:commit"),
+        scopes=("ralfia:demo", "ralfia:email:read", "ralfia:test:run"),
     ),
 }
 
@@ -121,6 +166,7 @@ class DemoSession:
     events: list[DemoEvent] = field(default_factory=list)
     actions: dict[str, dict[str, Any]] = field(default_factory=dict)
     idempotency: dict[str, str] = field(default_factory=dict)
+    owner_verified_at: str | None = None
 
 
 class DemoRegistry:
@@ -477,7 +523,7 @@ class CodexScenarioExecutor:
                 "        self.assertEqual(safe_total([120.0, -5.0, 30.0]), 150.0)\n",
                 encoding="utf-8",
             )
-        else:
+        elif scenario.scenario_id == "inspect_services":
             (workspace / "service_status.json").write_text(
                 json.dumps({"mcp": "active", "portal": "active", "worker": "degraded"}, indent=2),
                 encoding="utf-8",
@@ -489,6 +535,50 @@ class CodexScenarioExecutor:
                 "    def test_diagnosis_exists(self):\n"
                 "        text = Path('DIAGNOSIS.md').read_text()\n"
                 "        self.assertIn('worker', text.lower())\n",
+                encoding="utf-8",
+            )
+        else:
+            fixtures = {
+                "server_4_status": (
+                    "servers.json",
+                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "demo-health-primary", "server": ".4", "services": {"Panel": "active/up", "MCP": "active/up", "WhatsApp": "active/up"}}, indent=2),
+                    "STATUS_REPORT.md",
+                    ["'.4'", "'demo-health-primary'"],
+                ),
+                "server_5_status": (
+                    "servers.json",
+                    json.dumps({"checked_at": "2026-07-20T00:57:01Z", "evidence_ref": "demo-health-amd", "server": ".5", "services": {"Panel": "active/up", "MCP": "active/up", "Evolution API": "active/up"}}, indent=2),
+                    "STATUS_REPORT.md",
+                    ["'.5'", "'demo-health-amd'"],
+                ),
+                "daily_memory_checkin": (
+                    "checkin.txt",
+                    "Hoy me siento con presión antes del viaje, pero también ilusionado. Quiero guardar este patrón del día y dejar pendiente revisar mi descanso.",
+                    "MEMORY_NOTE.md",
+                    ["'hechos'", "'emociones'", "'pendientes'"],
+                ),
+                "devpost_snapshot": (
+                    "devpost_context.json",
+                    json.dumps({"project": "RalphiIA FounderOS", "devpost": "https://devpost.com/software/ralphiia-quoteops", "demo": "https://demo.pcdoctor.ai/remote-dev-demo", "github": "https://github.com/Rafa-Innerchispa/ralphiia-founderos-openai"}, indent=2),
+                    "DEVPOST_BRIEF.md",
+                    ["'devpost.com/software/ralphiia-quoteops'", "'github.com/rafa-innerchispa/ralphiia-founderos-openai'"],
+                ),
+                "email_triage": (
+                    "email_fixture.json",
+                    json.dumps({"subject": "Demo: revisar propuesta antes del viaje", "from": "cliente-demo@example.com", "body": "¿Puedes confirmar alcance y fecha de respuesta?"}, indent=2),
+                    "EMAIL_SUMMARY.md",
+                    ["'subject'", "'resumen'", "'borrador'"],
+                ),
+            }
+            fixture_name, fixture_body, output_name, expected = fixtures[scenario.scenario_id]
+            (workspace / fixture_name).write_text(fixture_body, encoding="utf-8")
+            assertions = "\n".join(f"        self.assertIn({needle}, text)" for needle in expected)
+            (workspace / "test_demo_output.py").write_text(
+                "from pathlib import Path\nimport unittest\n\n"
+                "class DemoOutputTest(unittest.TestCase):\n"
+                "    def test_expected_output_exists(self):\n"
+                f"        text = Path('{output_name}').read_text().lower()\n"
+                f"{assertions}\n",
                 encoding="utf-8",
             )
         (workspace / ".gitignore").write_text("__pycache__/\n*.py[cod]\n", encoding="utf-8")
@@ -588,11 +678,13 @@ class RemoteDevDemoService:
         coordination: CoordinationGateway,
         executor: ScenarioExecutor,
         media_processor: LocalMediaProcessor,
+        owner_code_sha256: str = "",
     ) -> None:
         self.registry = registry
         self.coordination = coordination
         self.executor = executor
         self.media_processor = media_processor
+        self.owner_code_sha256 = str(owner_code_sha256 or "").strip().lower()
 
     def create_session(self) -> dict[str, Any]:
         session, token = self.registry.create()
@@ -612,7 +704,32 @@ class RemoteDevDemoService:
             "coordination_mode": self.coordination.mode,
             "model_requested": getattr(self.executor, "model", None),
             "scenarios": [asdict(item) for item in SCENARIOS.values()],
+            "personal_memory_available": bool(self.owner_code_sha256),
+            "owner_verified": False,
         }
+
+    def unlock_owner(self, session_id: str, token: str, code: str) -> dict[str, Any]:
+        session = self.registry.require(session_id, token)
+        if not self.owner_code_sha256:
+            raise PermissionError("owner_mode_not_configured")
+        supplied = sha256(str(code or "").strip().encode()).hexdigest()
+        if not hmac.compare_digest(supplied, self.owner_code_sha256):
+            raise PermissionError("owner_code_invalid")
+        session.owner_verified_at = _now()
+        self.registry.add_event(
+            session,
+            "owner_mode_unlocked",
+            actor=session.actor_id,
+            tool="owner-code",
+            detail="Modo Rafael desbloqueado para guardar Daily Life Memory real vía MCP.",
+        )
+        return {"ok": True, "owner_verified": True, "snapshot": self.registry.snapshot(session)}
+
+    def require_owner(self, session_id: str, token: str) -> DemoSession:
+        session = self.registry.require(session_id, token)
+        if not session.owner_verified_at:
+            raise PermissionError("owner_mode_required")
+        return session
 
     async def submit(
         self,

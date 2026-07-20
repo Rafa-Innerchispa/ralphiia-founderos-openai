@@ -20,6 +20,7 @@ class DemoSettings:
     remote_dev_timeout_seconds = int(os.getenv("REMOTE_DEV_TIMEOUT_SECONDS", "240"))
     remote_dev_model = os.getenv("REMOTE_DEV_MODEL", "gpt-5.6-sol")
     remote_dev_whisper_url = os.getenv("REMOTE_DEV_WHISPER_URL", "http://127.0.0.1:9001")
+    remote_dev_owner_code_sha256 = os.getenv("REMOTE_DEV_OWNER_CODE_SHA256", "")
 
 
 app = FastAPI(
