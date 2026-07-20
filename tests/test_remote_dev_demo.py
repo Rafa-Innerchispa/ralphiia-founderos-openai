@@ -126,6 +126,37 @@ class RemoteDevDemoTest(unittest.TestCase):
                 )
             )
 
+
+    def test_chat_greeting_does_not_create_ops_task(self):
+        result = self.service.chat(
+            self.session["session_id"],
+            self.session["session_token"],
+            request_id="chat-1",
+            message="Hola, ¿cómo estás?",
+            lang="es",
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["intent"], "greeting")
+        self.assertIn("Hola Rafael", result["reply"])
+        self.assertEqual(len(self.coordination.created), 0)
+        event_types = [item["event_type"] for item in result["snapshot"]["events"]]
+        self.assertIn("chat_message_received", event_types)
+        self.assertIn("intent_classified", event_types)
+        self.assertNotIn("ops_task_created", event_types)
+
+    def test_api_chat_endpoint_returns_conversational_reply(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        response = client.post(
+            f"/api/remote-dev/sessions/{self.session['session_id']}/chat",
+            headers={"X-Demo-Session-Token": self.session["session_token"]},
+            json={"request_id": "chat-api-1", "message": "Hello", "lang": "en"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["intent"], "greeting")
+        self.assertEqual(len(self.coordination.created), 0)
+
     def test_submit_creates_mcp_task_and_requires_checkpoint(self):
         result = self.submit()
         self.assertTrue(result["ok"])
@@ -200,7 +231,7 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertFalse(payload["sudo"])
         page = client.get("/remote-dev-demo")
         self.assertEqual(page.status_code, 200)
-        self.assertIn("Remote Developer Control Plane", page.text)
+        self.assertIn("FounderOS WhatsApp", page.text)
 
     def test_public_session_creation_is_rate_limited_without_storing_ip(self):
         app = FastAPI()

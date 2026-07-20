@@ -45,6 +45,12 @@ class MemorySearchRequest(BaseModel):
     limit: int = 5
 
 
+class ChatRequest(BaseModel):
+    request_id: str
+    message: str
+    lang: str = "es"
+
+
 class DemoRateLimiter:
     """Small in-memory limiter; client identifiers are hashed and never logged."""
 
@@ -167,6 +173,30 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             return JSONResponse(demo.create_session())
         except PermissionError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @router.post("/api/remote-dev/sessions/{session_id}/chat")
+    async def remote_dev_chat(
+        request: Request,
+        session_id: str,
+        payload: ChatRequest,
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            if not limiter.allow(_client_key(request) + ":chat", limit=60, window_seconds=600):
+                raise PermissionError("demo_rate_limit_reached")
+            return JSONResponse(
+                demo.chat(
+                    session_id,
+                    session_token,
+                    request_id=payload.request_id,
+                    message=payload.message,
+                    lang=payload.lang,
+                )
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.post("/api/remote-dev/sessions/{session_id}/messages")
     async def remote_dev_message(

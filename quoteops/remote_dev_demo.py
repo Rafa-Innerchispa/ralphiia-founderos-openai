@@ -731,6 +731,79 @@ class RemoteDevDemoService:
             raise PermissionError("owner_mode_required")
         return session
 
+    def chat(
+        self,
+        session_id: str,
+        token: str,
+        *,
+        request_id: str,
+        message: str,
+        lang: str = "es",
+    ) -> dict[str, Any]:
+        """Conversational path: logs a real session event without creating an OPS task."""
+        started = perf_counter()
+        session = self.registry.require(session_id, token)
+        request_id = str(request_id or "").strip()[:100]
+        if not request_id:
+            raise ValueError("demo_request_id_required")
+        clean_message = str(message or "").strip()[:MAX_MESSAGE_CHARS]
+        if not clean_message:
+            raise ValueError("message_required")
+        lower = clean_message.lower()
+        if any(word in lower for word in ("hola", "hello", "buenas", "hey")):
+            intent = "greeting"
+        elif any(word in lower for word in ("siento", "ansiedad", "triste", "feliz", "pelea", "discusión", "discusion", "estrés", "estres", "salud", "mental")):
+            intent = "daily_reflection"
+        elif any(word in lower for word in ("recuerda", "memoria", "diario", "patrón", "patron")):
+            intent = "memory_context"
+        else:
+            intent = "conversation"
+        message_id = _safe_id("chat_demo", 8)
+        correlation_id = f"chat-{sha256(f'{session_id}:{request_id}:chat'.encode()).hexdigest()[:16]}"
+        self.registry.add_event(
+            session,
+            "chat_message_received",
+            actor=session.actor_id,
+            tool="whatsapp_chat_emulator",
+            latency_ms=(perf_counter() - started) * 1000,
+            detail=clean_message,
+            evidence={"message_id": message_id, "correlation_id": correlation_id},
+        )
+        self.registry.add_event(
+            session,
+            "identity_verified",
+            actor="ralfia-auth",
+            tool="same-session-token+hmac",
+            detail="Identidad efímera verificada para conversación; no se creó tarea operativa.",
+        )
+        owner_ready = bool(session.owner_verified_at)
+        if str(lang or "es").lower().startswith("en"):
+            replies = {
+                "greeting": "Hi Rafael — I’m here. You can tell me what happened, ask for server status, or ask me to save/search your memory.",
+                "daily_reflection": "I’m listening. This sounds like daily-life context; if you want it stored, use Save memory or say ‘save this’ after unlocking Rafael mode.",
+                "memory_context": "I can help with memory. Unlock Rafael mode to save or search private memories safely.",
+                "conversation": "I’m with you. Tell me more, or ask for a concrete action like server .4 status, email triage, Devpost context, or Codex work.",
+            }
+            saved_hint = " Rafael mode is already unlocked, so memory actions are available." if owner_ready else ""
+        else:
+            replies = {
+                "greeting": "Hola Rafael, aquí estoy. Puedes contarme qué pasó, pedirme revisar servidores, o pedirme guardar/buscar memoria.",
+                "daily_reflection": "Te escucho. Esto suena como contexto de tu día; si quieres conservarlo, usa Guardar memoria o dime ‘guarda esto’ con modo Rafael desbloqueado.",
+                "memory_context": "Puedo ayudarte con memoria. Desbloquea modo Rafael para guardar o buscar recuerdos privados de forma segura.",
+                "conversation": "Estoy contigo. Cuéntame más, o pídeme una acción concreta como estado del .4, correos, Devpost o trabajo con Codex.",
+            }
+            saved_hint = " Modo Rafael ya está desbloqueado, así que las acciones de memoria están disponibles." if owner_ready else ""
+        reply = replies[intent] + saved_hint
+        self.registry.add_event(
+            session,
+            "intent_classified",
+            actor="ralfia",
+            tool="conversation-router",
+            detail=f"Intent: {intent}. No se creó tarea OPS porque no era una acción operativa.",
+            evidence={"intent": intent, "owner_mode": owner_ready},
+        )
+        return {"ok": True, "reply": reply, "intent": intent, "correlation_id": correlation_id, "snapshot": self.registry.snapshot(session)}
+
     async def submit(
         self,
         session_id: str,
