@@ -144,6 +144,16 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertIn("intent_classified", event_types)
         self.assertNotIn("ops_task_created", event_types)
 
+    def test_frontend_uses_founderos_api_alias_and_safe_json_parser(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        page = client.get("/founderos")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("const API_BASE='/founderos/api'", page.text)
+        self.assertIn("async function apiJson", page.text)
+        self.assertNotIn("/api/founderos/live-status", page.text)
+
     def test_founderos_api_aliases_work(self):
         app = FastAPI()
         app.include_router(build_remote_dev_router(object(), self.service))
@@ -152,6 +162,10 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(created.status_code, 200)
         live = client.get("/api/founderos/live-status")
         self.assertEqual(live.status_code, 200)
+        live_under_page = client.get("/founderos/api/live-status")
+        self.assertEqual(live_under_page.status_code, 200)
+        created_under_page = client.post("/founderos/api/sessions")
+        self.assertEqual(created_under_page.status_code, 200)
 
     def test_api_chat_endpoint_returns_conversational_reply(self):
         app = FastAPI()

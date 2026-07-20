@@ -256,6 +256,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     async def remote_dev_legacy_page() -> HTMLResponse:
         return HTMLResponse(render_remote_dev_demo())
 
+    @router.get("/founderos/api/live-status")
     @router.get("/api/founderos/live-status")
     @router.get("/api/remote-dev/live-status")
     async def remote_dev_live_status() -> JSONResponse:
@@ -275,6 +276,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             }
         )
 
+    @router.get("/founderos/api/capabilities")
     @router.get("/api/founderos/capabilities")
     @router.get("/api/remote-dev/capabilities")
     async def remote_dev_capabilities() -> JSONResponse:
@@ -303,6 +305,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
             }
         )
 
+    @router.post("/founderos/api/sessions")
     @router.post("/api/founderos/sessions")
     @router.post("/api/remote-dev/sessions")
     async def create_remote_dev_session(request: Request) -> JSONResponse:
@@ -313,6 +316,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/chat")
     @router.post("/api/founderos/sessions/{session_id}/chat")
     @router.post("/api/remote-dev/sessions/{session_id}/chat")
     async def remote_dev_chat(
@@ -338,6 +342,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/media-chat")
     @router.post("/api/founderos/sessions/{session_id}/media-chat")
     @router.post("/api/remote-dev/sessions/{session_id}/media-chat")
     async def founderos_media_chat(
@@ -371,6 +376,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/messages")
     @router.post("/api/founderos/sessions/{session_id}/messages")
     @router.post("/api/remote-dev/sessions/{session_id}/messages")
     async def remote_dev_message(
@@ -403,6 +409,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/actions/{action_id}/approve")
     @router.post("/api/founderos/sessions/{session_id}/actions/{action_id}/approve")
     @router.post("/api/remote-dev/sessions/{session_id}/actions/{action_id}/approve")
     async def approve_remote_dev_action(
@@ -424,6 +431,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.get("/founderos/api/sessions/{session_id}")
     @router.get("/api/founderos/sessions/{session_id}")
     @router.get("/api/remote-dev/sessions/{session_id}")
     async def remote_dev_session(
@@ -435,6 +443,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/media-preview")
     @router.post("/api/founderos/sessions/{session_id}/media-preview")
     @router.post("/api/remote-dev/sessions/{session_id}/media-preview")
     async def remote_dev_media_preview(
@@ -457,6 +466,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/owner-unlock")
     @router.post("/api/founderos/sessions/{session_id}/owner-unlock")
     @router.post("/api/remote-dev/sessions/{session_id}/owner-unlock")
     async def remote_dev_owner_unlock(
@@ -469,6 +479,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/daily-memory")
     @router.post("/api/founderos/sessions/{session_id}/daily-memory")
     @router.post("/api/remote-dev/sessions/{session_id}/daily-memory")
     async def remote_dev_daily_memory(
@@ -527,6 +538,7 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @router.post("/founderos/api/sessions/{session_id}/daily-memory/search")
     @router.post("/api/founderos/sessions/{session_id}/daily-memory/search")
     @router.post("/api/remote-dev/sessions/{session_id}/daily-memory/search")
     async def remote_dev_daily_memory_search(
