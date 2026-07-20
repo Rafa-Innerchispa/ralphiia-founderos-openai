@@ -243,15 +243,16 @@ The first supported real case is FEMAR's access-control replacement or rehabilit
 
 ## Submission files
 
-For Devpost's optional upload field, use a PDF or ZIP generated from the materials in this repository. Suggested contents:
+For Devpost's optional upload field, use the ready ZIP included in this repo:
 
 ```text
-RalphiIA-FounderOS-Submission-Evidence.pdf
-README.md
-docs/DEVPOST_SUBMISSION.md
-docs/DEMO_SCRIPT.md
-docs/BUILD_WEEK_CHANGES.md
-screenshots/
+submission/ralphiia-founderos-submission-pack.zip
 ```
 
-Do not upload `.env`, secrets, personal exports, database dumps, or raw private logs.
+Direct GitHub download:
+
+```text
+https://github.com/Rafa-Innerchispa/ralphiia-founderos-openai/raw/main/submission/ralphiia-founderos-submission-pack.zip
+```
+
+It contains README/testing/submission evidence docs only. Do not upload `.env`, secrets, personal exports, database dumps, or raw private logs.
