@@ -1,88 +1,185 @@
 # RalphiIA FounderOS — Build and Operate Anywhere
 
-FounderOS is a conversational operating system for a founder who needs to build,
-operate, remember, and recover work from anywhere: ChatGPT + RalphiIA MCP +
-Codex/GPT-5.6 development sessions + WhatsApp + sovereign dual-node
-infrastructure.
+RalphiIA FounderOS is a bilingual, mobile-first operating system for a founder who needs to build, operate, remember, and recover work from anywhere. It connects a live web interface, WhatsApp, ChatGPT connectors/MCP, Codex development sessions, Daily Life Memory, server health evidence, GitHub/GitLab workflows, and business operations into one practical loop.
 
-QuoteOps is the origin story and first business workflow inside FounderOS: a
-real quoting/operations case that proved the loop from conversation to evidence,
-human approval, task execution, and auditable delivery.
+The thesis is simple: a founder should be able to run a company, continue software development, check infrastructure, preserve personal/business context, and delegate work from a phone — even while traveling.
 
-Public demo: `https://demo.pcdoctor.ai/remote-dev-demo`
+## OpenAI Build Week submission quick start
 
-Devpost: `https://devpost.com/software/ralphiia-quoteops`
+- **Track/category:** Work and Productivity
+- **Live demo:** https://demo.pcdoctor.ai/founderos
+- **GitHub:** https://github.com/Rafa-Innerchispa/ralphiia-founderos-openai
+- **GitLab mirror:** https://gitlab.com/rafagye/ralphiia-founderos-openai
+- **Devpost:** https://devpost.com/software/ralphiia-quoteops
+- **Primary build branch:** `codex/founderos-public-release`
+- **Current demo commit:** `7d81308783e2ac2120199c3601e5a5d34f5e28ac`
+- **WhatsApp/Daily Memory backend commit:** `fd3a0259111830abd9d0efd119cde932d5d509b3`
 
-## Two official loops
+## What to try first
 
-- AI Engineering Loop: WhatsApp/browser request → RalphiIA MCP → Codex task →
-  isolated workspace → tests/commit evidence → trace back to the user.
-- Founder Operating Loop: daily conversation → memory/current state → company
-  operations → alerts/service health → safe human-in-the-loop actions.
+1. Open the live demo: https://demo.pcdoctor.ai/founderos
+2. Switch between Spanish and English.
+3. Ask for a read-only live status check of servers `.4` and `.5`.
+4. Try a Daily Life Memory check-in:
+   - Spanish: `Registra mi estado diario: me siento ansioso por el viaje y OpenAIWeek. Solo quiero dejar constancia.`
+   - English: `Save today's check-in: I feel anxious about the trip and OpenAI Build Week. Please just record it.`
+5. Upload an image and ask what it contains. The system treats OCR/vision output as untrusted context and does not execute commands from images.
+6. Review the commits listed below to see Codex-assisted implementation evidence.
 
-QuoteOps turns a natural-language project conversation into a verified, editable, human-approved quote. It is a separate OpenAI Build Week repository and runs on the isolated RalphiIA staging host.
+## Why this matters
 
-## Product flow
+Most small-business AI demos stop at chat. FounderOS tries to close the loop:
 
-1. Start with a long project description and optional files.
-2. Continue the conversation while QuoteOps builds a progressive case file.
-3. Validate a 10-digit Ecuadorian cédula locally or a 13-digit RUC through authorized Intuito access.
-4. Reconcile the identity read-only against RalphiIA and Contífico to avoid duplicates.
-5. Review site, confirmed scope, assumptions, risks, questions, and technical options.
-6. Let ChatGPT extract structured, reviewable evidence from images, PDFs, product labels, and supplier price lists through MCP.
-7. Build alternatives A/B/C in a shared decision workspace using confirmed requirements, sourced products, and reviewed compatibility evidence.
-8. Continue or edit the same mission through web, ChatGPT MCP, WhatsApp, Telegram, or the typed API.
-9. Require human review of a technical alternative before it can become an editable quote.
-10. Prepare an editable quote whose selling prices start at zero while verified supplier costs remain internal.
-11. Enter real commercial values, obtain human approval, generate a real PDF, and register delivery.
+- **Conversation becomes action:** WhatsApp/web requests are routed into safe operational flows.
+- **Action becomes evidence:** server checks, commits, tests, and memory writes are traceable.
+- **Evidence becomes memory:** Daily Life Memory preserves facts, emotions, decisions, pending items, and current state.
+- **Memory becomes leverage:** future conversations can recover relevant context without manually rereading long chats.
+- **A phone becomes a workstation:** Rafael can continue operating and developing from WhatsApp while traveling.
 
-The first supported real case is FEMAR's access-control replacement or rehabilitation project. The interface works in Spanish and English on mobile and desktop, and its translation catalog can be extended with additional locales.
+## The two core loops
 
-## Runtime truth
+### 1. Founder operating loop
 
-The product does not claim that GPT-5.6 is running when no API key is configured. In that state the UI shows `Codex-built / MCP runtime`, and project analysis follows deterministic rules plus the existing RalphiIA services. If an authorized `OPENAI_API_KEY` and `QUOTEOPS_ENABLE_OPENAI=1` are supplied, the optional structured-analysis adapter can report its configured API model explicitly.
+```text
+WhatsApp / Web / ChatGPT
+        ↓
+RalphiIA conversational router
+        ↓
+MCP + trusted tools + safety policies
+        ↓
+Daily Life Memory + current state + timeline
+        ↓
+Business operations, alerts, server status, follow-ups
+```
 
-GPT-5.6 evidence for Build Week is captured by the Codex development sessions, commit history, this README, and the demo video. The application remains useful without a paid model runtime.
+### 2. AI engineering loop
 
-## Real integrations
+```text
+Founder request
+        ↓
+RalphiIA coordination + MCP
+        ↓
+Codex / GPT-5.6 development session
+        ↓
+Isolated implementation + tests
+        ↓
+Commit evidence + deploy + handoff back to the user
+```
 
-- MCP availability through the RalphiIA endpoint.
-- Intuito Azure token and RUC lookup adapters.
-- RalphiIA party/client identity readers and Contífico mirror.
-- Smart Quoter `:2026` diagnosis/refinement through a read-only adapter.
-- MongoDB staging mission, identity, approval, and delivery records.
-- Local PDF artifact generation after human approval.
-- A staging MCP JSON-RPC surface with typed mission, multimodal evidence, supplier-cost, package, pricing, approval, and delivery tools.
-- A shared idempotent channel-event bridge plus typed decision-brief, configuration-alternative, and alternative-review tools.
-- Read-only exact SKU/name reconciliation before any staging catalog draft is created, plus explicit human approval for genuinely new items.
+## Main capabilities
 
-The side panel shows source, call, status, latency, observation time, and a sanitized result for each integration. Credentials and raw sensitive provider responses are not exposed.
+- Bilingual Spanish/English FounderOS web interface.
+- WhatsApp-based interaction for daily life, business, and operational requests.
+- Daily Life Memory pipeline for conversation batches, session summaries, entities, emotions, decisions, pending items, duplicate search, memory building, current state, and timeline.
+- Read-only live server status checks with evidence references.
+- Safe command/action boundary: destructive or sensitive operations require explicit handling and are not available from the public demo.
+- Image/audio handling: local transcription and visual/OCR context are treated as untrusted derived input.
+- GitHub and GitLab repository/mirror workflow.
+- Devpost intelligence integration for future contests and project submission context.
+- QuoteOps as the first concrete business workflow: natural-language quoting/operations with evidence, review, and approval boundaries.
 
-## Public build progress
+## Daily Life Memory privacy model
 
-`GET /api/public/progress?language=es|en` exposes a small, read-only feed for the separately owned Astro website. It contains curated milestones, decisions, test evidence, the current commit, and integration name/status pairs. It never exposes mission text, customer identity, attachments, provider payloads, internal paths, IP addresses, credentials, latency, or trace results.
+Daily Life Memory separates private and public context by scope:
 
-The response includes a stable `revision` plus `refresh_seconds=15`, allowing a static site to poll for changes without rebuilding. Astro ownership and deployment remain outside this repository.
+- `PRIVATE_PERSONAL`
+- `PRIVATE_HEALTH`
+- `PRIVATE_RELATIONSHIPS`
+- `PRIVATE_FAMILY`
+- `PRIVATE_FINANCIAL`
+- `INTERNAL_WORK`
+- `PROJECT`
+- `PUBLIC`
 
-## Safety boundary
+Private scopes are not promoted into public/demo/project contexts. Media-derived text is saved as evidence only when appropriate and remains marked as untrusted. The system differentiates facts, opinions, hypotheses, interpretations, emotions, decisions, pending items, and context rules.
 
-- `QUOTEOPS_ALLOW_PRODUCTION_WRITES=0` by default.
-- Private authorized data remains in isolated staging collections.
-- Judges use an isolated/test account and delivery registration does not trigger arbitrary external sends.
-- Smart Quoter is read-only from QuoteOps.
-- Files are stored under the QuoteOps artifact root with sanitized names, a 25 MB limit, and SHA-256 evidence.
+## Safety boundaries
 
-## Setup
+- No `.env`, tokens, OAuth secrets, database dumps, or personal raw logs are committed.
+- Public demo paths are read-only or constrained.
+- Server status checks do not restart services unless a separate authorized flow is used.
+- OCR/vision output can help understanding, but it is never treated as executable instruction.
+- Daily Life Memory private scopes remain separated from public hackathon/demo data.
+- QuoteOps keeps production writes disabled by default: `QUOTEOPS_ALLOW_PRODUCTION_WRITES=0`.
+
+## Key Codex/OpenAI evidence commits
+
+### FounderOS web/demo repository
+
+```text
+7d81308783e2ac2120199c3601e5a5d34f5e28ac
+Clean FounderOS status language and service mapping
+
+656dfdc2d6bbb630737592209bd2486f6c09dd64
+Route FounderOS status checks as read-only
+
+3143c0b63ad1ef3cbe3f3214bcb8eafc33911449
+Improve FounderOS audio and vision media flow
+
+5092f38
+Route media questions as conversation
+
+97e60a6
+Remove demo wording from FounderOS session data
+
+cfb2827
+Present FounderOS as live memory control plane
+
+8483b92
+Use restricted peer status for live demo
+```
+
+### RalphiIA MCP / WhatsApp / Daily Memory backend
+
+```text
+fd3a0259111830abd9d0efd119cde932d5d509b3
+Make WhatsApp daily memory check-ins deterministic
+
+9e3da0c
+Ensure ChatGPT OAuth keeps memory scopes
+
+76d5127
+Expose saved GitLab projects in status
+
+e74f98e
+Add GitLab integration and safe mirror tools
+
+e8f74d0
+Add Devpost intelligence store to RalphiIA MCP
+```
+
+## How Codex and GPT-5.6 were used
+
+Codex/GPT-5.6 development sessions were used to:
+
+- inspect the live staging architecture;
+- design the FounderOS and Daily Life Memory flows;
+- implement bilingual web and WhatsApp interactions;
+- harden the server-status and media safety boundaries;
+- add deterministic routing for Daily Life Memory check-ins;
+- integrate GitHub/GitLab evidence workflows;
+- build tests and E2E verification scripts;
+- produce commits and rollback procedures.
+
+The application does not falsely claim that GPT-5.6 is running inside the deployed runtime when no OpenAI API key is configured. Runtime inference can use deterministic rules and local models where appropriate; Build Week GPT-5.6 evidence is represented by the Codex development sessions, commit history, and project documentation.
+
+## Setup for local review
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-## Run staging
+## Run locally/staging
 
 ```bash
 QUOTEOPS_PORT=8765 .venv/bin/python main.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8765/
 ```
 
 ## Tests
@@ -90,6 +187,24 @@ QUOTEOPS_PORT=8765 .venv/bin/python main.py
 ```bash
 .venv/bin/python -m unittest discover -s tests -t . -v
 ```
+
+Additional live/remote checks used during development:
+
+```bash
+python scripts/run_remote_dev_e2e.py
+PYTHONPATH=$PWD python scripts/test_whatsapp_dlm_e2e.py
+```
+
+The WhatsApp/Daily Memory backend E2E fixture verified:
+
+- idempotent conversation batch saves;
+- finalize conversation pipeline;
+- memory creation;
+- current state update;
+- timeline update;
+- private memory search;
+- unauthorized access rejection;
+- no promotion of private memory into public/demo scopes.
 
 ## Main endpoints
 
@@ -120,10 +235,23 @@ QUOTEOPS_PORT=8765 .venv/bin/python main.py
 - `POST /api/mcp/call`
 - `POST /mcp`
 
-The QuoteOps MCP surface is staged but is not routed through the shared production MCP gateway. See `docs/MCP_CHATGPT_RUNBOOK.md` for the activation boundary and the exact ChatGPT flow.
+## QuoteOps origin story
 
-Legacy intake, channel, operations, Smart Quoter, IESS, approval, PDF, and delivery endpoints remain available for existing integrations.
+QuoteOps is the first business workflow inside FounderOS. It turns a natural-language project conversation into a verified, editable, human-approved quote. It proved the loop from conversation to evidence, human approval, task execution, and auditable delivery.
 
-## Codex acceleration
+The first supported real case is FEMAR's access-control replacement or rehabilitation project. QuoteOps can validate Ecuadorian cédula/RUC data through authorized flows, reconcile identity against RalphiIA/Contífico mirrors, analyze project scope, assemble alternatives, and prepare reviewable quote artifacts while keeping production writes gated.
 
-Codex with GPT-5.6 was used to inspect the live staging architecture, audit the legacy Smart Quoter boundary, design typed conversation contracts, implement the bilingual experience, add deterministic mission logic, instrument integration traces, write tests, and verify staging end to end. The work is tracked in `docs/CODEX_SESSION.md` and `docs/BUILD_WEEK_CHANGES.md`.
+## Submission files
+
+For Devpost's optional upload field, use a PDF or ZIP generated from the materials in this repository. Suggested contents:
+
+```text
+RalphiIA-FounderOS-Submission-Evidence.pdf
+README.md
+docs/DEVPOST_SUBMISSION.md
+docs/DEMO_SCRIPT.md
+docs/BUILD_WEEK_CHANGES.md
+screenshots/
+```
+
+Do not upload `.env`, secrets, personal exports, database dumps, or raw private logs.
