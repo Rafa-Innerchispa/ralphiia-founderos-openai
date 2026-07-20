@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from hashlib import sha256
 import shutil
+import subprocess
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -77,6 +78,68 @@ def _client_key(request: Request) -> str:
     return forwarded or (request.client.host if request.client else "unknown")
 
 
+READ_ONLY_USER_SERVICES = (
+    "ralfia-mcp.service",
+    "whatsapp-automation.service",
+    "ralfia-remote-dev-demo.service",
+)
+READ_ONLY_SYSTEM_SERVICES = ("nginx", "mongod")
+
+
+def _service_state(args: list[str]) -> str:
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=3, check=False)
+    except Exception as exc:
+        return f"unavailable:{type(exc).__name__}"
+    value = (result.stdout or result.stderr or "unknown").strip().splitlines()
+    return (value[0] if value else "unknown")[:80]
+
+
+def _safe_service_snapshot() -> dict[str, Any]:
+    services: dict[str, str] = {}
+    for name in READ_ONLY_USER_SERVICES:
+        services[name] = _service_state(["systemctl", "--user", "is-active", name])
+    for name in READ_ONLY_SYSTEM_SERVICES:
+        services[name] = _service_state(["systemctl", "is-active", name])
+    return {
+        "server": ".4",
+        "host": "192.168.1.4",
+        "reachable": True,
+        "services": services,
+    }
+
+
+def _remote_safe_service_snapshot(host: str, label: str) -> dict[str, Any]:
+    remote_script = (
+        "for s in ralfia-mcp.service whatsapp-automation.service "
+        "evolution-api.service ralfia-remote-dev-demo.service; do "
+        "printf '%s=' \"$s\"; systemctl --user is-active \"$s\" 2>/dev/null || echo unknown; done; "
+        "for s in nginx mongod; do printf '%s=' \"$s\"; systemctl is-active \"$s\" 2>/dev/null || echo unknown; done"
+    )
+    try:
+        result = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", f"rlopez@{host}", remote_script],
+            capture_output=True,
+            text=True,
+            timeout=7,
+            check=False,
+        )
+    except Exception as exc:
+        return {"server": label, "host": host, "reachable": False, "error": type(exc).__name__, "services": {}}
+    services: dict[str, str] = {}
+    for line in (result.stdout or "").splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            services[key[:80]] = value.strip()[:80]
+    return {
+        "server": label,
+        "host": host,
+        "reachable": result.returncode == 0,
+        "services": services,
+        "error": (result.stderr or "").strip()[:240] if result.returncode else None,
+    }
+
+
 def build_remote_dev_service(settings: Any) -> RemoteDevDemoService:
     mode = str(getattr(settings, "remote_dev_demo_mode", "offline")).lower()
     if mode == "mcp" and getattr(settings, "remote_dev_mcp_api_key", ""):
@@ -137,6 +200,19 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     @router.get("/remote-dev-demo", response_class=HTMLResponse)
     async def remote_dev_demo_page() -> HTMLResponse:
         return HTMLResponse(render_remote_dev_demo())
+
+    @router.get("/api/remote-dev/live-status")
+    async def remote_dev_live_status() -> JSONResponse:
+        checked_at = datetime.now(timezone.utc).isoformat()
+        return JSONResponse(
+            {
+                "ok": True,
+                "checked_at": checked_at,
+                "policy": "read_only_allowlist_no_sudo_no_arbitrary_shell",
+                "layers": ["Cloudflare/demo.pcdoctor.ai", "demo service :8766", "MCP :8102", "WhatsApp automation", "MongoDB"],
+                "servers": [_safe_service_snapshot(), _remote_safe_service_snapshot("192.168.1.5", ".5")],
+            }
+        )
 
     @router.get("/api/remote-dev/capabilities")
     async def remote_dev_capabilities() -> JSONResponse:

@@ -218,6 +218,19 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(self.coordination.finished[0][1], True)
         self.assertEqual(self.coordination.finished[0][2]["status"], "PASS")
 
+
+    def test_live_status_endpoint_is_read_only(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        response = client.get("/api/remote-dev/live-status")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("read_only", payload["policy"])
+        self.assertIn("no_sudo", payload["policy"])
+        self.assertGreaterEqual(len(payload["servers"]), 1)
+
     def test_api_never_exposes_production_or_arbitrary_shell(self):
         app = FastAPI()
         app.include_router(build_remote_dev_router(object(), self.service))
