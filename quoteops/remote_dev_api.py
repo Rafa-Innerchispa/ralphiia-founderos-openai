@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from hashlib import sha256
+import json
 import shutil
 import subprocess
 from threading import RLock
@@ -261,13 +262,18 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
     @router.get("/api/remote-dev/live-status")
     async def remote_dev_live_status() -> JSONResponse:
         checked_at = datetime.now(timezone.utc).isoformat()
+        servers = [_safe_service_snapshot(), _remote_safe_service_snapshot("192.168.1.5", ".5")]
+        evidence_ref = "founderos-live:" + sha256(
+            json.dumps({"checked_at": checked_at, "servers": servers}, sort_keys=True).encode()
+        ).hexdigest()[:16]
         return JSONResponse(
             {
                 "ok": True,
                 "checked_at": checked_at,
+                "evidence_ref": evidence_ref,
                 "policy": "read_only_allowlist_no_sudo_no_arbitrary_shell",
                 "layers": ["Cloudflare/demo.pcdoctor.ai", "FounderOS web :8766", "MCP :8102", "WhatsApp automation", "MongoDB"],
-                "servers": [_safe_service_snapshot(), _remote_safe_service_snapshot("192.168.1.5", ".5")],
+                "servers": servers,
             }
         )
 
