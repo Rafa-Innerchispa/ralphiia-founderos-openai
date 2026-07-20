@@ -322,6 +322,39 @@ def build_remote_dev_router(settings: Any, service: RemoteDevDemoService | None 
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @router.post("/api/founderos/sessions/{session_id}/media-chat")
+    @router.post("/api/remote-dev/sessions/{session_id}/media-chat")
+    async def founderos_media_chat(
+        request: Request,
+        session_id: str,
+        request_id: str = Form(...),
+        message: str = Form(""),
+        lang: str = Form("es"),
+        media: UploadFile = File(...),
+        session_token: str = Header(..., alias="X-Demo-Session-Token"),
+    ) -> JSONResponse:
+        try:
+            if not limiter.allow(_client_key(request) + ":media-chat", limit=30, window_seconds=600):
+                raise PermissionError("founderos_rate_limit_reached")
+            media_data = await media.read(MAX_MEDIA_BYTES + 1)
+            return JSONResponse(
+                demo.chat_media(
+                    session_id,
+                    session_token,
+                    request_id=request_id,
+                    message=message,
+                    media=media_data,
+                    media_type=media.content_type or "",
+                    lang=lang,
+                )
+            )
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
     @router.post("/api/founderos/sessions/{session_id}/messages")
     @router.post("/api/remote-dev/sessions/{session_id}/messages")
     async def remote_dev_message(

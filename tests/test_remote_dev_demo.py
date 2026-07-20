@@ -166,6 +166,39 @@ class RemoteDevDemoTest(unittest.TestCase):
         self.assertEqual(response.json()["intent"], "greeting")
         self.assertEqual(len(self.coordination.created), 0)
 
+
+    def test_media_chat_does_not_create_ops_task(self):
+        result = self.service.chat_media(
+            self.session["session_id"],
+            self.session["session_token"],
+            request_id="media-chat-1",
+            message="Qué hay en esta foto?",
+            media=b"synthetic-image",
+            media_type="image/png",
+            lang="es",
+        )
+        self.assertTrue(result["ok"])
+        self.assertIn("Revisé la imagen", result["reply"])
+        self.assertEqual(len(self.coordination.created), 0)
+        event_types = [item["event_type"] for item in result["snapshot"]["events"]]
+        self.assertIn("media_message_received", event_types)
+        self.assertIn("media_processed", event_types)
+        self.assertNotIn("ops_task_created", event_types)
+
+    def test_api_media_chat_endpoint_is_conversational(self):
+        app = FastAPI()
+        app.include_router(build_remote_dev_router(object(), self.service))
+        client = TestClient(app)
+        response = client.post(
+            f"/api/founderos/sessions/{self.session['session_id']}/media-chat",
+            headers={"X-Demo-Session-Token": self.session["session_token"]},
+            data={"request_id": "media-api-1", "message": "Qué hay en esta foto?", "lang": "es"},
+            files={"media": ("foto.png", b"synthetic-image", "image/png")},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self.coordination.created), 0)
+        self.assertIn("Revisé la imagen", response.json()["reply"])
+
     def test_submit_creates_mcp_task_and_requires_checkpoint(self):
         result = self.submit()
         self.assertTrue(result["ok"])

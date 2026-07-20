@@ -816,6 +816,69 @@ class RemoteDevDemoService:
         )
         return {"ok": True, "reply": reply, "intent": intent, "correlation_id": correlation_id, "snapshot": self.registry.snapshot(session)}
 
+    def chat_media(
+        self,
+        session_id: str,
+        token: str,
+        *,
+        request_id: str,
+        message: str,
+        media: bytes,
+        media_type: str,
+        lang: str = "es",
+    ) -> dict[str, Any]:
+        """Conversational media path: analyze attached media without creating an operational action."""
+        started = perf_counter()
+        session = self.registry.require(session_id, token)
+        request_id = str(request_id or "").strip()[:100]
+        if not request_id:
+            raise ValueError("live_request_id_required")
+        clean_message = str(message or "").strip()[:MAX_MESSAGE_CHARS]
+        media_started = perf_counter()
+        media_result = self.media_processor.process(media, media_type or "")
+        message_id = _safe_id("media_chat", 8)
+        correlation_id = f"media-{sha256(f'{session_id}:{request_id}:media'.encode()).hexdigest()[:16]}"
+        self.registry.add_event(
+            session,
+            "media_message_received",
+            actor=session.actor_id,
+            tool="founderos-web-media",
+            latency_ms=(perf_counter() - started) * 1000,
+            detail=clean_message or "Archivo recibido para conversación.",
+            evidence={"message_id": message_id, "correlation_id": correlation_id},
+        )
+        self.registry.add_event(
+            session,
+            "media_processed",
+            actor="local-media",
+            tool=media_result.provider,
+            latency_ms=(perf_counter() - media_started) * 1000,
+            detail="El archivo fue analizado como contexto conversacional; no se creó acción operativa.",
+            evidence={"checksum": media_result.checksum, "provider": media_result.provider, "kind": media_result.kind},
+        )
+        derived = (media_result.text or "").strip()
+        if str(lang or "es").lower().startswith("en"):
+            if media_result.kind == "image":
+                reply = "I reviewed the attached image. "
+                reply += (f"Readable text/content I could extract: {derived[:900]}" if derived else "I could not extract clear text from it here. Tell me what part you want me to inspect.")
+            else:
+                reply = f"I transcribed the audio: {derived[:900]}" if derived else "I received the audio, but I could not transcribe clear speech."
+        else:
+            if media_result.kind == "image":
+                reply = "Revisé la imagen adjunta. "
+                reply += (f"Texto/contenido legible que pude extraer: {derived[:900]}" if derived else "No pude extraer texto claro aquí. Si quieres, dime qué zona debo revisar.")
+            else:
+                reply = f"Transcribí el audio: {derived[:900]}" if derived else "Recibí el audio, pero no pude transcribir voz clara."
+        self.registry.add_event(
+            session,
+            "conversation_reply_ready",
+            actor="ralfia",
+            tool="media-conversation-router",
+            detail="Respuesta conversacional lista; sin checkpoint porque no hay ejecución.",
+            evidence={"media_kind": media_result.kind},
+        )
+        return {"ok": True, "reply": reply, "media": asdict(media_result), "correlation_id": correlation_id, "snapshot": self.registry.snapshot(session)}
+
     async def submit(
         self,
         session_id: str,
