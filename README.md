@@ -1,4 +1,24 @@
-# RalphiIA QuoteOps
+# RalphiIA FounderOS — Build and Operate Anywhere
+
+FounderOS is a conversational operating system for a founder who needs to build,
+operate, remember, and recover work from anywhere: ChatGPT + RalphiIA MCP +
+Codex/GPT-5.6 development sessions + WhatsApp + sovereign dual-node
+infrastructure.
+
+QuoteOps is the origin story and first business workflow inside FounderOS: a
+real quoting/operations case that proved the loop from conversation to evidence,
+human approval, task execution, and auditable delivery.
+
+Public demo: `https://demo.pcdoctor.ai/remote-dev-demo`
+
+Devpost: `https://devpost.com/software/ralphiia-quoteops`
+
+## Two official loops
+
+- AI Engineering Loop: WhatsApp/browser request → RalphiIA MCP → Codex task →
+  isolated workspace → tests/commit evidence → trace back to the user.
+- Founder Operating Loop: daily conversation → memory/current state → company
+  operations → alerts/service health → safe human-in-the-loop actions.
 
 QuoteOps turns a natural-language project conversation into a verified, editable, human-approved quote. It is a separate OpenAI Build Week repository and runs on the isolated RalphiIA staging host.
 
