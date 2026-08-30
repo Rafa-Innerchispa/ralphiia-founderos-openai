@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import fitz
-from rapidocr_onnxruntime import RapidOCR
 
 
 PARSER_VERSION = "pacifico-ocr-v1"
@@ -79,6 +78,10 @@ def _balance_after_label(lines: list[str], label: str) -> float | None:
 
 def ocr_pdf_pages(path: str | Path) -> list[list[str]]:
     document = fitz.open(str(path))
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+    except Exception as exc:
+        raise RuntimeError("rapidocr_not_available_for_python_runtime") from exc
     engine = RapidOCR()
     pages: list[list[str]] = []
     with tempfile.TemporaryDirectory(prefix="quoteops-ocr-") as tmp:
